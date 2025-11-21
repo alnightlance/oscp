@@ -1,4 +1,16 @@
-cat file | grep pattern | cut -d ' ' -f 4 | tr -d '%'
+export key="value"
+        setup variable for all subprocess (iverwise set key="value" only for current user)
+!!      повторить последнюю команду
+wc      подсчет байт/символов/слов/строк в файле
+sed     редактирование на лету (stream editing: sed 's/from/to/')
+cat file | grep pattern | cut -d ' ' -f 4 | tr -d '%' | sort | uniq
+cut -d ":" -f 2 <file>
+        divider ":", field 2, from every line in file
+awk -F "::" '{print $1 $5}'
+        продвинутый cut, подволяет задавать в качестве разделителя более 1 символа
+sort    сортировка вывода 
+uniq -c подсчет количества повторяющихся строк, т.к. сравнивает только с соседними
+w       список зашедших в систему пользователей
 
 target validation: whois, nslookup, dnsrecon
 
