@@ -23,7 +23,7 @@ netdisover -r ip/net
 	поиск хостов в сети
 
 nmap -sS ip
-	SYS SYNACK ACK scan of well known ports
+	SYS->SYNACK (without ->ACK) scan of well known ports
 nmap -T4 -p- -A ip
 	T[1-5], 5 - agressive, 1 - slow, -T3 - тоже самое, что без ключа T вообще
 	-p- all 65535 ports
