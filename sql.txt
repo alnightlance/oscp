@@ -90,6 +90,10 @@ select pg_sleep(5);               -- задержка
 select count(*) from table;       -- количество строк
 'foo'||'bar'
 SUBSTRING('foobar', 4, 2)
+select current_user;                       -- текущий пользователь
+select session_user;                        -- пользователь сессии
+select is_superuser;                         -- является ли суперпользователем
+select usename, usesuper from pg_user;      -- все пользователи и их права
 
 select pg_read_file('/etc/passwd',0,10000);			-- чтение файла
 select datname from pg_database;				-- все БД
